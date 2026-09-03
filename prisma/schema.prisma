@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ImpactLevel {
+  none
+  minor
+  occurred
+}
+
+enum KnowledgeStatus {
+  considering
+  completed
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+  critical
+}
+
+enum PointType {
+  KP
+  SP
+  AP
+}
+
+enum PointSourceType {
+  knowledge
+  skill
+  achievement
+  quest
+}
+
+model User {
+  id                 String              @id @default(uuid()) @db.Uuid
+  email              String              @unique @db.VarChar(320)
+  displayName        String              @db.VarChar(100)
+  timezone           String              @default("Asia/Tokyo") @db.VarChar(64)
+  monthlyReportDay   Int                 @default(1) @db.SmallInt
+  monthlyReportTime  DateTime            @default(dbgenerated("'07:00:00'::time")) @db.Time(0)
+  totalEp            Int                 @default(0)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  knowledgeEntries   KnowledgeEntry[]
+  acquiredSkills     AcquiredSkill[]
+  achievementRecords AchievementRecord[]
+  monthlyReports     MonthlyReport[]
+  pointEvents        PointEvent[]
+
+  @@map("users")
+}
+
+model KnowledgeEntry {
+  id                   String          @id @default(uuid()) @db.Uuid
+  userId               String          @db.Uuid
+  occurredAt           DateTime        @db.Timestamptz(3)
+  subject              String          @db.VarChar(200)
+  content              String
+  potentialImpact      String?
+  perceivedCause       String?
+  detectionTrigger     String?
+  reuseIdea            String?
+  impactLevel          ImpactLevel     @default(none)
+  status               KnowledgeStatus @default(considering)
+  categories           String[]        @default([])
+  occurrenceScore      Int?            @db.SmallInt
+  severityScore        Int?            @db.SmallInt
+  detectabilityScore   Int?            @db.SmallInt
+  rpn                  Int?            @db.SmallInt
+  riskLevel            RiskLevel?
+  summary              String
+  knowledgePoints      Int             @default(0)
+  knowledgePointReason String
+  createdAt            DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime        @updatedAt @db.Timestamptz(3)
+  deletedAt            DateTime?       @db.Timestamptz(3)
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointEvents          PointEvent[]
+
+  @@index([userId, occurredAt(sort: Desc)])
+  @@index([userId, status])
+  @@map("knowledge_entries")
+}
+
+model AcquiredSkill {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @db.Uuid
+  title      String
+  points     Int          @default(0)
+  reason     String
+  acquiredAt DateTime     @db.Timestamptz(3)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointEvents PointEvent[]
+
+  @@index([userId, acquiredAt(sort: Desc)])
+  @@map("acquired_skills")
+}
+
+model AchievementRecord {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  title       String
+  points      Int          @default(0)
+  reason      String
+  achievedAt  DateTime     @db.Timestamptz(3)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointEvents PointEvent[]
+
+  @@index([userId, achievedAt(sort: Desc)])
+  @@map("achievement_records")
+}
+
+model MonthlyReport {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @db.Uuid
+  periodKey          String   @db.VarChar(7)
+  periodStart        DateTime @db.Timestamptz(3)
+  periodEnd          DateTime @db.Timestamptz(3)
+  generatedAt        DateTime @default(now()) @db.Timestamptz(3)
+  monthlyTitle       String
+  monthlyMessage     String
+  monthlyFocus       String
+  engineerTitle      String
+  engineerMessage    String
+  engineerNextAction String
+  snapshotJson       Json
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodKey])
+  @@index([userId, generatedAt(sort: Desc)])
+  @@map("monthly_reports")
+}
+
+model PointEvent {
+  id                  String           @id @default(uuid()) @db.Uuid
+  userId              String           @db.Uuid
+  pointType           PointType
+  sourceType          PointSourceType
+  knowledgeEntryId    String?          @db.Uuid
+  acquiredSkillId     String?          @db.Uuid
+  achievementRecordId String?          @db.Uuid
+  points              Int
+  reason              String
+  idempotencyKey      String           @unique
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  knowledgeEntry      KnowledgeEntry?  @relation(fields: [knowledgeEntryId], references: [id], onDelete: Cascade)
+  acquiredSkill       AcquiredSkill?   @relation(fields: [acquiredSkillId], references: [id], onDelete: Cascade)
+  achievementRecord   AchievementRecord? @relation(fields: [achievementRecordId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, pointType])
+  @@map("point_events")
+}
