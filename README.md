@@ -140,6 +140,7 @@ Safety Quest は、日々の業務経験を「ナレッジ」「スキル」「�
 DATABASE_URL="postgresql://postgres:xxx@db.xxx.supabase.co:5432/postgres?sslmode=require"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 OPENROUTER_API_KEY="your_openrouter_api_key"
+OPENROUTER_MODEL="openai/gpt-4o-mini"
 ```
 
 ### 補足
@@ -216,6 +217,7 @@ Vercel の Project Settings → Environment Variables で以下を登録しま�
 DATABASE_URL="postgresql://postgres:xxx@db.xxx.supabase.co:5432/postgres?sslmode=require"
 NEXT_PUBLIC_APP_URL="https://your-app.vercel.app"
 OPENROUTER_API_KEY="your_openrouter_api_key"
+OPENROUTER_MODEL="openai/gpt-4o-mini"
 ```
 
 #### 4. ビルドコマンドを確認
@@ -263,6 +265,7 @@ npm run start
 DATABASE_URL="..."
 NEXT_PUBLIC_APP_URL="https://your-render-url.onrender.com"
 OPENROUTER_API_KEY="..."
+OPENROUTER_MODEL="openai/gpt-4o-mini"
 ```
 
 #### 3. 初回起動後に DB 反映

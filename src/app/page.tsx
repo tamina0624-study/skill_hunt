@@ -176,7 +176,6 @@ const pageTitles: Record<PageKey, string> = {
   settings: "設定",
 };
 
-const todayIsoDate = () => new Date().toISOString().slice(0, 10);
 const nowLocalInput = () => {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -184,7 +183,6 @@ const nowLocalInput = () => {
 };
 
 const currentMonthInput = () => new Date().toISOString().slice(0, 7);
-const monthInputToIsoDate = (yearMonth: string) => `${yearMonth || currentMonthInput()}-01T00:00:00.000Z`;
 
 const calculateRisk = (occurrence: number, severity: number, detectability: number) => {
   const rpn = occurrence * severity * detectability;
@@ -482,7 +480,6 @@ export default function Home() {
     const inferredSeverity = form.actualHarm === "occurred" ? 5 : form.potentialImpact ? 4 : 3;
     const inferredDetectability = form.detectionTrigger ? 3 : 4;
     const risk = calculateRisk(inferredOccurrence, inferredSeverity, inferredDetectability);
-    const knowledgeJudgment = judgeKnowledgePoints(form, risk.riskLevel);
 
     const response = await fetch("/api/knowledge", {
       method: "POST",
@@ -958,11 +955,6 @@ function buildSearchListItems(appState: AppState, searchText: string, kindFilter
   return items;
 }
 
-function buildKnowledgeSummary(form: DraftForm, riskLevel: RiskLevel) {
-  const summary = `${form.workContext}で${form.description.slice(0, 42)}${form.description.length > 42 ? "..." : ""}`;
-  return `${summary}。リスク目安は${riskLabels[riskLevel]}で、ナレッジとして記録しました。`;
-}
-
 function buildDraftCoachReply(text: string, form: DraftForm) {
   const work = form.workContext.trim() || "今回の作業";
   const event = form.description.trim() || "起こりそうだったこと";
@@ -1144,20 +1136,6 @@ function buildEngineerTrend(quests: Quest[], acquiredSkills: AcquiredSkill[], ne
   return points;
 }
 
-function judgeSkillPoints(title: string) {
-  const normalized = title.toLowerCase();
-  if (/自動|テスト|監視|ci|cd|script|スクリプト|型|lint|検証/.test(normalized)) {
-    return { points: 50, reason: "AI判定: 自動化や検証の仕組みに関わるスキルのため50SPです。" };
-  }
-  if (/設計|レビュー|分析|改善|再発|原因|要件|仕様/.test(normalized)) {
-    return { points: 30, reason: "AI判定: 設計、分析、レビューに関わる再利用しやすいスキルのため30SPです。" };
-  }
-  if (/確認|手順|チェック|共有|記録|整理/.test(normalized)) {
-    return { points: 20, reason: "AI判定: 作業品質を安定させる基本スキルのため20SPです。" };
-  }
-  return { points: 10, reason: "AI判定: 新しく言語化されたスキルとして10SPです。" };
-}
-
 function judgeKnowledgePoints(form: DraftForm, riskLevel: RiskLevel) {
   const text = `${form.workContext} ${form.description} ${form.potentialImpact} ${form.perceivedCause} ${form.detectionTrigger} ${form.userCountermeasure}`;
   let points = 10;
@@ -1188,20 +1166,6 @@ function judgeKnowledgePoints(form: DraftForm, riskLevel: RiskLevel) {
     points: Math.min(points, 60),
     reason: `AI判定: ${reasons.join("。 ")}。`,
   };
-}
-
-function judgeAchievementPoints(title: string) {
-  const normalized = title.toLowerCase();
-  if (/障害|本番|リリース|改善|自動|削減|解決|復旧|設計/.test(normalized)) {
-    return { points: 50, reason: "AI判定: 影響の大きい成果または改善実績として50APです。" };
-  }
-  if (/レビュー|共有|資料|標準化|手順|教育|支援|提案/.test(normalized)) {
-    return { points: 30, reason: "AI判定: チームや将来の作業に再利用できる実績として30APです。" };
-  }
-  if (/対応|確認|調査|整理|記録/.test(normalized)) {
-    return { points: 20, reason: "AI判定: 日々の業務改善につながる実績として20APです。" };
-  }
-  return { points: 10, reason: "AI判定: 実績として記録された行動に10APです。" };
 }
 
 function formatShortDate(value: string) {

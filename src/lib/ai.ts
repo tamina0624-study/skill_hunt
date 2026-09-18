@@ -75,6 +75,7 @@ export async function evaluateRecord(
   extraContext: Record<string, unknown> = {},
 ): Promise<EvaluationResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
+  const model = process.env.OPENROUTER_MODEL ?? 'openai/gpt-4o-mini';
 
   if (!apiKey) {
     return fallbackEvaluation(kind, title, content);
@@ -90,7 +91,7 @@ export async function evaluateRecord(
         'X-Title': 'Safety Quest',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
+        model,
         messages: [
           {
             role: 'system',

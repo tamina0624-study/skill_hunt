@@ -3,8 +3,8 @@
   "/api/health/route": "app/api/health/route.js",
   "/api/ai/route": "app/api/ai/route.js",
   "/api/achievements/route": "app/api/achievements/route.js",
-  "/api/knowledge/route": "app/api/knowledge/route.js",
   "/api/skills/route": "app/api/skills/route.js",
   "/api/reports/route": "app/api/reports/route.js",
+  "/api/knowledge/route": "app/api/knowledge/route.js",
   "/page": "app/page.js"
 }
