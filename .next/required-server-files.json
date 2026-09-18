@@ -99,7 +99,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "C:\\Users\\0018550835\\Desktop\\案件\\portforio\\safety-quest",
+    "outputFileTracingRoot": "C:\\Users\\tamin\\OneDrive\\ドキュメント\\ちち\\AI\\skill_hant",
     "experimental": {
       "useSkewCookie": false,
       "cacheLife": {
@@ -288,10 +288,10 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "C:\\Users\\0018550835\\Desktop\\案件\\portforio\\safety-quest"
+      "root": "C:\\Users\\tamin\\OneDrive\\ドキュメント\\ちち\\AI\\skill_hant"
     }
   },
-  "appDir": "C:\\Users\\0018550835\\Desktop\\案件\\portforio\\safety-quest",
+  "appDir": "C:\\Users\\tamin\\OneDrive\\ドキュメント\\ちち\\AI\\skill_hant",
   "relativeAppDir": "",
   "files": [
     ".next\\routes-manifest.json",

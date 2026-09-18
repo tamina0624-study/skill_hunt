@@ -1,4 +1,10 @@
 {
   "/_not-found/page": "/_not-found",
+  "/api/health/route": "/api/health",
+  "/api/ai/route": "/api/ai",
+  "/api/achievements/route": "/api/achievements",
+  "/api/knowledge/route": "/api/knowledge",
+  "/api/skills/route": "/api/skills",
+  "/api/reports/route": "/api/reports",
   "/page": "/"
 }

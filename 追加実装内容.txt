@@ -1,0 +1,321 @@
+
+DBとAI連携の導入方針を、現状のMVP構成を壊さない形で具体的な設計として整理します。
+
+## 提案方針
+
+現状の構成は「画面ロジックと擬似AI判定が一つのページに集まっている」ので、まずは次の2つを分離するのが安全です。
+
+1. DBアクセス層を分離する
+2. AI評価を Adapter として抽象化する
+
+この形にすると、後で localStorage から PostgreSQL へ替えても、画面側はほぼ変更不要です。
+
+---
+
+## 1. DB実装の提案
+
+### 1-1. PostgreSQL + Prisma を正式導入
+既存の schema はかなり整理されているので、そのまま DB へ落とし込みます。
+
+採用方針:
+- ORM: Prisma
+- DB: PostgreSQL
+- 接続: Next.js App Router の Route Handlers から Prisma Client を利用
+- 重要設計: user_id の分離、point_events の冪等性管理を徹底
+
+実装例:
+- `schema.prisma` を正式に migrate
+- `.env` に `DATABASE_URL` を設定
+- `prisma generate`
+- `prisma migrate dev`
+
+実務上の流れ:
+1. schema を確認
+2. `prisma migrate dev --name init`
+3. `seed.ts` でダミーユーザーと初期データを作成
+4. App Router の API で CRUD を実装
+
+---
+
+### 1-2. まずは Repository 層を追加
+画面側から直接 localStorage を触るのをやめて、次の層を追加します。
+
+- `src/lib/repositories/knowledgeRepository.ts`
+- `src/lib/repositories/skillRepository.ts`
+- `src/lib/repositories/achievementRepository.ts`
+- `src/lib/repositories/reportRepository.ts`
+
+責務:
+- 登録
+- 検索
+- 集計
+- 期間別取得
+- ポイント更新
+
+例:
+
+```ts
+export async function createKnowledgeEntry(data: {
+  userId: string;
+  occurredAt: Date;
+  subject: string;
+  content: string;
+  potentialImpact?: string;
+  perceivedCause?: string;
+  detectionTrigger?: string;
+  reuseIdea?: string;
+  impactLevel: "none" | "minor" | "occurred";
+  status: "considering" | "completed";
+  categories: string[];
+  summary: string;
+  knowledgePoints: number;
+  knowledgePointReason: string;
+}) {
+  return prisma.knowledgeEntry.create({
+    data: {
+      ...data,
+      userId: data.userId,
+      occurredAt: data.occurredAt,
+    }
+  });
+}
+```
+
+これにより、UI は「どこに保存されるか」を意識しなくなります。
+
+---
+
+### 1-3. point_events を本格運用
+今回の schema には `point_events` があり、これは重要です。  
+これを使って「二重加算防止」「履歴登録」「月次集計」を実装します。
+
+ルール:
+- KP/SP/AP の加算は必ず `point_events` に記録
+- `idempotencyKey` を一意の値で生成
+- 同じ登録を繰り返しても 1 回だけ加算する
+
+例:
+
+```ts
+const idempotencyKey = `${userId}:${sourceType}:${sourceId}:${points}`;
+```
+
+理由:
+- UX 的なダブルクリック対策
+- API Retry 対策
+- 会計的な整合性維持
+
+---
+
+### 1-4. localStorage からの移行戦略
+最小リスクで行うなら次の順序がよいです。
+
+1. 現状の state を維持
+2. API/Repository 層を実装
+3. localStorage を読み出して DB に同期する "一括移行" 関数を作る
+4. 画面側を API 呼び出しに切り替える
+5. localStorage 参照を完全撤去
+
+こうすると、既存データを壊さずに段階移行できます。
+
+---
+
+## 2. AI連携の実装提案
+
+### 2-1. AI は Adapter で抽象化する
+今の実装では AI 判定ロジックがページファイル内に埋め込まれています。  
+これは本番では危険なので、AI を次のように切り出します。
+
+- `src/lib/ai/types.ts`
+- `src/lib/ai/openai.ts`
+- `src/lib/ai/fallback.ts`
+
+インターフェース例:
+
+```ts
+export interface AiEvaluator {
+  evaluateKnowledge(input: KnowledgeEvaluationInput): Promise<AiEvaluationResult>;
+  evaluateSkill(input: SkillEvaluationInput): Promise<AiEvaluationResult>;
+  evaluateAchievement(input: AchievementEvaluationInput): Promise<AiEvaluationResult>;
+  generateMonthlyReport(input: ReportInput): Promise<MonthlyReportDraft>;
+}
+```
+
+これにより、OpenAI / Azure OpenAI / 互換 API に替えても画面側は変更しません。
+
+---
+
+### 2-2. AI入力は「機密マスキング」前提にする
+要件でも明記されている通り、機密情報をそのまま AI に送らないのが前提です。  
+既存の `maskSecrets` の仕組みをそのまま活用しましょう。
+
+例:
+- 顧客名
+- APIキー
+- 本番URL
+- 秘密鍵
+- Bearer トークン
+
+実装例:
+
+```ts
+const masked = maskSecrets(userInput)
+```
+
+そして AI 呼び出し前に必ず:
+- 機密チェック
+- 置換
+- 最小限の情報だけ送る
+
+AIへの入力は「必要最小限」にすることが重要です。
+
+---
+
+### 2-3. 実際のプロンプト設計
+各評価は JSON 形式で返すようにします。  
+これがポイントです。UI でそのまま扱いやすくなります。
+
+例:
+
+```ts
+type AiEvaluationResult = {
+  points: number;
+  reason: string;
+  title?: string;
+  summary?: string;
+}
+```
+
+例のプロンプト:
+
+```text
+あなたは IT エンジニアの経験を評価するアシスタントです。
+次の入力をもとに、KP を 0〜60 の範囲で評価してください。
+出力は JSON 形式のみで、以下のキーを含めてください:
+{
+  "points": number,
+  "reason": string
+}
+```
+
+これにより、画面側が JSON を直接処理できます。
+
+---
+
+### 2-4. 生成側の実装方法
+AI連携は「評価」と「レポート生成」で分けるのがよいです。
+
+#### 評価
+- `evaluateKnowledge`
+- `evaluateSkill`
+- `evaluateAchievement`
+
+#### レポート生成
+- `generateMonthlyReport`
+
+月次レポートは、今の設計の通り「前年/今月の集計」「適切な文体」「前向きな表現」を AI に依頼するのが有効です。
+
+例:
+- 5件のナレッジ
+- 2件のスキル
+- 1件の実績
+- 合計 KP/SP/AP
+- 次の一手
+
+この入力を AI に渡して、月次メッセージと次のアクションを生成させる。
+
+---
+
+### 2-5. AI失敗時のフォールバック
+本番では AI の失敗は避けられません。  
+なので、ルールベースの fallback を必ず用意します。
+
+例:
+- AI API がタイムアウト → 既存の `judgeKnowledgePoints` を使う
+- AI の応答が invalid JSON → ルールベース値を使う
+- 率が低い場合は UI で「AI評価を再試行」と表示
+
+設計としては:
+
+```ts
+try {
+  return await openAiEvaluator.evaluateKnowledge(input);
+} catch {
+  return fallback.evaluateKnowledge(input);
+}
+```
+
+これでサービスが止まりません。
+
+---
+
+## 3. 具体的な実装順序
+
+### Phase 1: DB 基盤
+- Prisma schema を正式化
+- PostgreSQL を立ち上げ
+- `migrate` 実行
+- ダミーデータ seed
+- CRUD API 作成
+
+### Phase 2: Data Access Layer
+- Repository に分離
+- localStorage から DB への移行準備
+- `point_events` の整合性管理
+
+### Phase 3: AI Adapter
+- OpenAI / Azure OpenAI 連携
+- JSON 返却
+- maskSecrets を適用
+- fallback 実装
+
+### Phase 4: Auth
+- demo login から実認証へ
+- ユーザーごとのデータ分離
+- middleware / session
+
+### Phase 5: 運用
+- logger
+- monitoring
+- 再試行
+- rate limit
+- secret scanning
+
+---
+
+## 4. 一番おすすめの実装形
+
+このプロジェクトに最も適した形は次の構成です。
+
+- Next.js App Router
+- Prisma + PostgreSQL
+- Route Handlers
+- AI Adapter 抽象化
+- ルールベース fallback
+- localStorage からの段階移行
+
+つまり、現状のMVPを壊さずに、後方互換のまま本番へ近づける設計が最も現実的です。
+
+---
+
+## 5. 実装時の注意点
+
+- AIに完全な仕事ログや秘密情報を直接渡さない
+- `point_events` を必ず使う
+- 画面と保存先を分離する
+- JSON 返却で型安全にする
+- 失敗時の fallback を必ず用意する
+
+---
+
+## 6. 結論
+
+DBは「Prisma + PostgreSQL」で正式化し、AIは「Adapter + fallback + JSON出力」で実装するのが最も良いです。  
+この組み合わせなら、今のMVPを維持しながら、次段の本番運用に自然に移行できます。
+
+必要なら次に、
+1. 具体的なディレクトリ構成案
+2. Route Handler のコード例
+3. OpenAI 連携の最小実装例
+
+までそのまま作れます。

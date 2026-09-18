@@ -295,6 +295,115 @@ const formFromNearMiss = (nearMiss: NearMiss): DraftForm => ({
   confidentialityConfirmed: true,
 });
 
+const refreshServerState = async (fallbackState: AppState = initialState): Promise<AppState> => {
+  try {
+    const [knowledgeResponse, skillResponse, achievementResponse] = await Promise.all([
+      fetch("/api/knowledge"),
+      fetch("/api/skills"),
+      fetch("/api/achievements"),
+    ]);
+
+    const saved = window.localStorage.getItem(storageKey);
+    const baseState = saved ? (JSON.parse(saved) as AppState) : fallbackState;
+    const nextState: AppState = { ...baseState };
+
+    if (knowledgeResponse.ok) {
+      const knowledgeEntries = (await knowledgeResponse.json()) as Array<{
+        id: string;
+        occurredAt: string;
+        subject: string;
+        content: string;
+        potentialImpact?: string | null;
+        perceivedCause?: string | null;
+        detectionTrigger?: string | null;
+        reuseIdea?: string | null;
+        impactLevel?: "none" | "minor" | "occurred";
+        status?: "considering" | "completed";
+        categories?: string[];
+        occurrenceScore?: number | null;
+        severityScore?: number | null;
+        detectabilityScore?: number | null;
+        rpn?: number | null;
+        riskLevel?: RiskLevel | null;
+        summary?: string;
+        knowledgePoints?: number;
+        knowledgePointReason?: string;
+      }>;
+
+      nextState.nearMisses = knowledgeEntries.map((entry) => ({
+        id: entry.id,
+        occurredAt: entry.occurredAt,
+        workContext: entry.subject,
+        description: entry.content,
+        potentialImpact: entry.potentialImpact ?? "",
+        perceivedCause: entry.perceivedCause ?? "",
+        detectionTrigger: entry.detectionTrigger ?? "",
+        userCountermeasure: entry.reuseIdea ?? "",
+        actualHarm: (entry.impactLevel ?? "none") as HarmLevel,
+        categories: entry.categories ?? ["その他"],
+        occurrence: entry.occurrenceScore ?? 3,
+        severity: entry.severityScore ?? 3,
+        detectability: entry.detectabilityScore ?? 3,
+        rpn: entry.rpn ?? 27,
+        riskLevel: (entry.riskLevel ?? "low") as RiskLevel,
+        aiSummary: entry.summary ?? "DBから読み込んだナレッジです。",
+        status: (entry.status ?? "considering") as NearMissStatus,
+        knowledgePoints: entry.knowledgePoints ?? 0,
+        knowledgePointReason: entry.knowledgePointReason ?? "DBから読み込んだナレッジです。",
+        boss: (entry.riskLevel ?? "low") === "critical",
+        countermeasures: [],
+      }));
+    }
+
+    if (skillResponse.ok) {
+      const skills = (await skillResponse.json()) as Array<{
+        id: string;
+        title: string;
+        points: number;
+        reason: string;
+        acquiredAt: string;
+      }>;
+
+      nextState.acquiredSkills = skills.map((skill) => ({
+        id: skill.id,
+        title: skill.title,
+        points: skill.points,
+        reason: skill.reason,
+        acquiredAt: skill.acquiredAt,
+      }));
+    }
+
+    if (achievementResponse.ok) {
+      const achievements = (await achievementResponse.json()) as Array<{
+        id: string;
+        title: string;
+        points: number;
+        reason: string;
+        achievedAt: string;
+      }>;
+
+      nextState.achievementRecords = achievements.map((achievement) => ({
+        id: achievement.id,
+        title: achievement.title,
+        points: achievement.points,
+        reason: achievement.reason,
+        achievedAt: achievement.achievedAt,
+      }));
+    }
+
+    const nextTotalXp = [...(nextState.nearMisses ?? []), ...((nextState.acquiredSkills ?? []) as unknown as Array<{ points: number }>), ...((nextState.achievementRecords ?? []) as unknown as Array<{ points: number }>)]
+      .reduce((total, item) => total + (("knowledgePoints" in item ? item.knowledgePoints : "points" in item ? item.points : 0) as number), 0);
+
+    nextState.totalXp = Math.max(nextTotalXp, 0);
+    nextState.selectedId = nextState.nearMisses[0]?.id ?? "";
+    return nextState;
+  } catch (error) {
+    console.warn("Failed to load server-side data", error);
+    const saved = window.localStorage.getItem(storageKey);
+    return saved ? (JSON.parse(saved) as AppState) : fallbackState;
+  }
+};
+
 export default function Home() {
   const [appState, setAppState] = useState<AppState>(initialState);
   const [page, setPage] = useState<PageKey>("dashboard");
@@ -308,11 +417,13 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(storageKey);
-    if (saved) {
-      setAppState(JSON.parse(saved) as AppState);
-    }
-    setLoaded(true);
+    const loadFromServer = async () => {
+      const nextState = await refreshServerState(initialState);
+      setAppState(nextState);
+      setLoaded(true);
+    };
+
+    void loadFromServer();
   }, []);
 
   useEffect(() => {
@@ -362,7 +473,7 @@ export default function Home() {
     setPage("create");
   };
 
-  const submitNearMiss = (event: FormEvent<HTMLFormElement>) => {
+  const submitNearMiss = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.workContext.trim() || !form.description.trim() || !form.confidentialityConfirmed) {
       return;
@@ -372,32 +483,34 @@ export default function Home() {
     const inferredDetectability = form.detectionTrigger ? 3 : 4;
     const risk = calculateRisk(inferredOccurrence, inferredSeverity, inferredDetectability);
     const knowledgeJudgment = judgeKnowledgePoints(form, risk.riskLevel);
-    const newNearMiss: NearMiss = {
-      id: `nm-${Date.now()}`,
-      occurredAt: form.occurredAt,
-      workContext: form.workContext.trim(),
-      description: form.description.trim(),
-      potentialImpact: form.potentialImpact.trim(),
-      perceivedCause: form.perceivedCause.trim(),
-      detectionTrigger: form.detectionTrigger.trim(),
-      userCountermeasure: form.userCountermeasure.trim(),
-      actualHarm: form.actualHarm,
-      status: form.status,
-      categories: inferCategories(form),
-      occurrence: inferredOccurrence,
-      severity: inferredSeverity,
-      detectability: inferredDetectability,
-      ...risk,
-      aiSummary: buildKnowledgeSummary(form, risk.riskLevel),
-      knowledgePoints: knowledgeJudgment.points,
-      knowledgePointReason: knowledgeJudgment.reason,
-      boss: risk.riskLevel === "critical",
-      countermeasures: [
-        { id: `cm-${Date.now()}`, title: "チェックリストへ実行前確認を追加", level: 2, status: "proposed", dueAt: todayIsoDate(), xp: 20, effectiveness: "unknown" },
-        { id: `cm-${Date.now() + 1}`, title: "入力・対象選択を自動照合する仕組みを検討", level: 4, status: "proposed", dueAt: todayIsoDate(), xp: 50, effectiveness: "unknown" },
-      ],
-    };
-    setAppState((current) => ({ ...current, totalXp: current.totalXp + knowledgeJudgment.points, selectedId: newNearMiss.id, nearMisses: [newNearMiss, ...current.nearMisses] }));
+
+    const response = await fetch("/api/knowledge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        occurredAt: form.occurredAt,
+        actualHarm: form.actualHarm,
+        status: form.status,
+        workContext: form.workContext.trim(),
+        description: form.description.trim(),
+        potentialImpact: form.potentialImpact.trim(),
+        perceivedCause: form.perceivedCause.trim(),
+        detectionTrigger: form.detectionTrigger.trim(),
+        userCountermeasure: form.userCountermeasure.trim(),
+        categories: inferCategories(form),
+        occurrence: inferredOccurrence,
+        severity: inferredSeverity,
+        detectability: inferredDetectability,
+        rpn: risk.rpn,
+        riskLevel: risk.riskLevel,
+      }),
+    });
+
+    if (response.ok) {
+      const refreshed = await refreshServerState(appState);
+      setAppState(refreshed);
+    }
+
     setForm(blankForm());
     setShowOptional(false);
     setDraftMessages(initialDraftMessages);
@@ -423,44 +536,66 @@ export default function Home() {
     setChatInput("");
   };
 
-  const registerSkill = (title: string, yearMonth: string) => {
+  const registerSkill = async (title: string, yearMonth: string) => {
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
-    const judgment = judgeSkillPoints(cleanTitle);
-    const acquiredSkill: AcquiredSkill = {
-      id: `skill-${Date.now()}`,
-      title: cleanTitle,
-      points: judgment.points,
-      reason: judgment.reason,
-      acquiredAt: monthInputToIsoDate(yearMonth),
-    };
-    setAppState((current) => ({
-      ...current,
-      totalXp: current.totalXp + acquiredSkill.points,
-      acquiredSkills: [acquiredSkill, ...(current.acquiredSkills ?? [])],
-    }));
+
+    const response = await fetch("/api/skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: cleanTitle,
+        yearMonth,
+      }),
+    });
+
+    if (response.ok) {
+      const refreshed = await refreshServerState(appState);
+      setAppState(refreshed);
+    }
   };
 
-  const registerAchievement = (title: string, yearMonth: string) => {
+  const registerAchievement = async (title: string, yearMonth: string) => {
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
-    const judgment = judgeAchievementPoints(cleanTitle);
-    const achievement: AchievementRecord = {
-      id: `achievement-${Date.now()}`,
-      title: cleanTitle,
-      points: judgment.points,
-      reason: judgment.reason,
-      achievedAt: monthInputToIsoDate(yearMonth),
-    };
-    setAppState((current) => ({
-      ...current,
-      totalXp: current.totalXp + achievement.points,
-      achievementRecords: [achievement, ...(current.achievementRecords ?? [])],
-    }));
+
+    const response = await fetch("/api/achievements", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: cleanTitle,
+        yearMonth,
+      }),
+    });
+
+    if (response.ok) {
+      const refreshed = await refreshServerState(appState);
+      setAppState(refreshed);
+    }
   };
 
-  const generateReport = () => {
-    const report = buildAiReport(appState.nearMisses, appState.acquiredSkills ?? [], appState.achievementRecords ?? [], appState.totalXp, monthlyEngineerGrowth, latestNearMiss);
+  const generateReport = async () => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const response = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ yearMonth: currentMonth }),
+    });
+
+    if (!response.ok) {
+      const fallback = buildAiReport(appState.nearMisses, appState.acquiredSkills ?? [], appState.achievementRecords ?? [], appState.totalXp, monthlyEngineerGrowth, latestNearMiss);
+      setAppState((current) => {
+        const currentReports = getSavedReports(current);
+        return {
+          ...current,
+          reports: [fallback, ...currentReports.filter((savedReport) => savedReport.periodKey !== fallback.periodKey)],
+          latestReport: fallback,
+        };
+      });
+      return;
+    }
+
+    const report = (await response.json()) as AiReport;
     setAppState((current) => {
       const currentReports = getSavedReports(current);
       return {

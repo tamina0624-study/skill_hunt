@@ -1,0 +1,6 @@
+WebServer:Renderの無料サーバー
+DB：Supabase 
+AI：OpenRouterの無料AIエージェント
+
+WebServerからDBへのアクセスは
+StarSever上のPHP経由でDBへアクセスする想定
