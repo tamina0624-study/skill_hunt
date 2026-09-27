@@ -1,5 +1,19 @@
 # Safety Quest
 
+## GUI
+
+### ログイン
+
+![Safety Quest のGUI](doc/gui-screenshot.png)
+
+### ダッシュボード
+
+![Safety Questのダッシュボード](doc/gui-dashboard.png)
+
+### ナレッジ登録
+
+![Safety Questのナレッジ登録画面](doc/gui-knowledge-entry.png)
+
 Safety Quest は、日々の業務経験を「ナレッジ」「スキル」「実績」として記録し、AI ベースの評価ルールでポイント化し、成長を可視化するための MVP アプリです。
 
 ## 概要
