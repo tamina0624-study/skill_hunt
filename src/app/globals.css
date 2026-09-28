@@ -651,6 +651,69 @@ details.report-item summary {
   flex: 0 0 auto;
 }
 
+.ai-feedback-preview {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgb(23 111 103 / 22%);
+  border-radius: 8px;
+  background: rgb(240 250 247 / 78%);
+}
+
+.ai-feedback-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-feedback-head strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--brand-strong);
+}
+
+.ai-feedback-result {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: white;
+}
+
+.ai-feedback-result.stale {
+  opacity: 0.7;
+}
+
+.ai-feedback-result p,
+.ai-feedback-result small,
+.feedback-error {
+  margin: 0;
+}
+
+.ai-feedback-result small {
+  grid-column: 1 / -1;
+  color: var(--warn);
+}
+
+.feedback-points {
+  min-width: 68px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  color: white;
+  background: var(--brand);
+  font-weight: 900;
+  text-align: center;
+}
+
+.feedback-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
 .message {
   max-width: 86%;
   display: grid;
@@ -776,7 +839,8 @@ details.report-item summary {
   .inline-row,
   .quest-head,
   .form-actions,
-  .create-chat-form {
+  .create-chat-form,
+  .ai-feedback-head {
     align-items: stretch;
     flex-direction: column;
   }

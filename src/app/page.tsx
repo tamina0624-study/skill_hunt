@@ -134,6 +134,12 @@ type AiReport = {
   engineerEvaluation: EngineerAssessment;
 };
 
+type AiFeedback = {
+  points: number;
+  reason: string;
+  riskLevel?: RiskLevel;
+};
+
 type AppState = {
   userEmail: string;
   totalXp: number;
@@ -760,7 +766,14 @@ function CreateView({ form, setForm, showOptional, setShowOptional, onSubmit, me
           <label>次に活かす工夫<textarea value={form.userCountermeasure} onChange={(event) => setForm({ ...form, userCountermeasure: event.target.value })} /></label>
         </div>}
         <label className="check-row"><input type="checkbox" checked={form.confidentialityConfirmed} onChange={(event) => setForm({ ...form, confidentialityConfirmed: event.target.checked })} />登録内容に顧客名、APIキー、秘密鍵などの機密情報が含まれていないことを確認しました。</label>
-        <div className="form-actions"><span className="help">必須項目と機密情報確認が完了すると登録できます。</span><button className="primary" type="submit"><Sparkles size={18} />ナレッジポイントを評価して登録</button></div>
+        <AiFeedbackPreview
+          kind="knowledge"
+          pointUnit="KP"
+          title={form.workContext}
+          content={draftContext}
+          extraContext={{ actualHarm: form.actualHarm, status: form.status }}
+        />
+        <div className="form-actions"><span className="help">必須項目と機密情報確認が完了すると登録できます。</span><button className="primary" type="submit"><Sparkles size={18} />この内容で登録</button></div>
       </form>
 
       <aside className="card stack create-discussion" aria-label="登録内容についてAIとディスカッション">
@@ -807,7 +820,8 @@ function QuestView({ registerSkill }: { registerSkill: (title: string, yearMonth
     <form className="card stack" onSubmit={(event) => { event.preventDefault(); registerSkill(skillText, skillYearMonth); setSkillText(""); }}>
       <label>年月<input type="month" value={skillYearMonth} onChange={(event) => setSkillYearMonth(event.target.value)} /></label>
       <textarea className="large-entry" value={skillText} onChange={(event) => setSkillText(event.target.value)} placeholder="身についたスキルを入力" />
-      <button className="primary" type="submit">スキルポイントを評価して登録</button>
+      <AiFeedbackPreview kind="skill" pointUnit="SP" title={skillText} content={skillText} extraContext={{ yearMonth: skillYearMonth }} />
+      <button className="primary" type="submit">この内容で登録</button>
     </form>
   );
 }
@@ -820,8 +834,56 @@ function AchievementView({ registerAchievement }: { registerAchievement: (title:
     <form className="card stack" onSubmit={(event) => { event.preventDefault(); registerAchievement(achievementText, achievementYearMonth); setAchievementText(""); }}>
       <label>年月<input type="month" value={achievementYearMonth} onChange={(event) => setAchievementYearMonth(event.target.value)} /></label>
       <textarea className="large-entry" value={achievementText} onChange={(event) => setAchievementText(event.target.value)} placeholder="達成した実績を入力" />
-      <button className="primary" type="submit">実績ポイントを評価して登録</button>
+      <AiFeedbackPreview kind="achievement" pointUnit="AP" title={achievementText} content={achievementText} extraContext={{ yearMonth: achievementYearMonth }} />
+      <button className="primary" type="submit">この内容で登録</button>
     </form>
+  );
+}
+
+function AiFeedbackPreview({ kind, pointUnit, title, content, extraContext }: { kind: "knowledge" | "skill" | "achievement"; pointUnit: "KP" | "SP" | "AP"; title: string; content: string; extraContext?: Record<string, unknown> }) {
+  const [feedback, setFeedback] = useState<AiFeedback | null>(null);
+  const [evaluatedContent, setEvaluatedContent] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const currentContent = JSON.stringify({ title: title.trim(), content: content.trim(), extraContext });
+  const isStale = Boolean(feedback && evaluatedContent !== currentContent);
+
+  const evaluate = async () => {
+    if (!title.trim() && !content.trim()) return;
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, title: title.trim(), content: content.trim(), extraContext }),
+      });
+      if (!response.ok) throw new Error("AI評価を取得できませんでした。");
+      setFeedback((await response.json()) as AiFeedback);
+      setEvaluatedContent(currentContent);
+    } catch {
+      setError("AIフィードバックを取得できませんでした。時間をおいて再度お試しください。");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <section className="ai-feedback-preview" aria-live="polite">
+      <div className="ai-feedback-head">
+        <div><strong><Bot size={17} />AIフィードバック</strong><p className="help">登録前にポイントの目安と判定理由を確認できます。</p></div>
+        <button className="secondary" type="button" disabled={isLoading || (!title.trim() && !content.trim())} onClick={() => void evaluate()}>
+          <Sparkles size={16} />{isLoading ? "評価中…" : feedback ? "AI評価を再取得" : "AI評価を取得"}
+        </button>
+      </div>
+      {feedback && <div className={`ai-feedback-result ${isStale ? "stale" : ""}`}>
+        <span className="feedback-points">{feedback.points}{pointUnit}</span>
+        <p>{feedback.reason}</p>
+        {isStale && <small>入力内容が変更されています。最新の内容で再評価してください。</small>}
+      </div>}
+      {error && <p className="feedback-error">{error}</p>}
+    </section>
   );
 }
 
