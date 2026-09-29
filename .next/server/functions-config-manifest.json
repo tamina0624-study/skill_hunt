@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/health": {},
+    "/api/ai": {},
+    "/api/skills": {},
+    "/api/reports": {},
+    "/api/knowledge": {},
+    "/api/achievements": {}
+  }
+}
