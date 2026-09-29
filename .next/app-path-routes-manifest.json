@@ -4,7 +4,7 @@
   "/api/ai/route": "/api/ai",
   "/api/achievements/route": "/api/achievements",
   "/api/skills/route": "/api/skills",
-  "/api/knowledge/route": "/api/knowledge",
   "/api/reports/route": "/api/reports",
+  "/api/knowledge/route": "/api/knowledge",
   "/page": "/"
 }

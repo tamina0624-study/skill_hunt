@@ -3,9 +3,9 @@
   "functions": {
     "/api/health": {},
     "/api/ai": {},
+    "/api/achievements": {},
     "/api/skills": {},
-    "/api/reports": {},
     "/api/knowledge": {},
-    "/api/achievements": {}
+    "/api/reports": {}
   }
 }

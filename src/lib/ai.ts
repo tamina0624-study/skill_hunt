@@ -96,7 +96,7 @@ export async function evaluateRecord(
           {
             role: 'system',
             content:
-              'You are a precise engineering productivity evaluator. Return only JSON with keys: points, reason, riskLevel. Use integer points between 0 and 100. riskLevel must be low|medium|high|critical.',
+              'You are a precise engineering productivity evaluator. Return only JSON with keys: points, reason, riskLevel. Use integer points between 0 and 100. riskLevel must be low|medium|high|critical. Always write reason in natural Japanese, regardless of the input language.',
           },
           {
             role: 'user',
