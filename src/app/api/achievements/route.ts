@@ -64,3 +64,22 @@ export async function POST(request: Request) {
 
   return NextResponse.json(item, { status: 201 });
 }
+
+export async function DELETE(request: Request) {
+  const id = new URL(request.url).searchParams.get('id')?.trim();
+
+  if (!id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  }
+
+  const user = await getDemoUser();
+  const result = await prisma.achievementRecord.deleteMany({
+    where: { id, userId: user.id },
+  });
+
+  if (result.count === 0) {
+    return NextResponse.json({ error: 'achievement not found' }, { status: 404 });
+  }
+
+  return new NextResponse(null, { status: 204 });
+}

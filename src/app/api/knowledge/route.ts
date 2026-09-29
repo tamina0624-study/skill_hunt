@@ -50,11 +50,31 @@ function calculateKnowledgePoints(payload: Record<string, unknown>) {
 export async function GET() {
   const user = await getDemoUser();
   const entries = await prisma.knowledgeEntry.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, deletedAt: null },
     orderBy: { createdAt: 'desc' },
   });
 
   return NextResponse.json(entries);
+}
+
+export async function DELETE(request: Request) {
+  const id = new URL(request.url).searchParams.get('id')?.trim();
+
+  if (!id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  }
+
+  const user = await getDemoUser();
+  const result = await prisma.knowledgeEntry.updateMany({
+    where: { id, userId: user.id, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+
+  if (result.count === 0) {
+    return NextResponse.json({ error: 'knowledge entry not found' }, { status: 404 });
+  }
+
+  return new NextResponse(null, { status: 204 });
 }
 
 export async function POST(request: Request) {

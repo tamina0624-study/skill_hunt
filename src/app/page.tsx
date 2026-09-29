@@ -16,6 +16,7 @@ import {
   Sparkles,
   Swords,
   Trophy,
+  Trash2,
 } from "lucide-react";
 
 type PageKey = "dashboard" | "create" | "list" | "quests" | "achievements" | "reports" | "settings";
@@ -103,6 +104,7 @@ type TrendPoint = {
 
 type SearchListItem = {
   id: string;
+  recordId: string;
   kind: Exclude<ListKind, "all">;
   title: string;
   summary: string;
@@ -577,6 +579,22 @@ export default function Home() {
     }
   };
 
+  const deleteListItem = async (item: SearchListItem) => {
+    const kindLabel = listKindLabels[item.kind];
+    if (!window.confirm(`${kindLabel}「${item.title}」を削除しますか？`)) return;
+
+    const endpoint = item.kind === "knowledge" ? "/api/knowledge" : item.kind === "skill" ? "/api/skills" : "/api/achievements";
+    const response = await fetch(`${endpoint}?id=${encodeURIComponent(item.recordId)}`, { method: "DELETE" });
+
+    if (!response.ok) {
+      window.alert("削除できませんでした。時間をおいて再度お試しください。");
+      return;
+    }
+
+    const refreshed = await refreshServerState(appState);
+    setAppState(refreshed);
+  };
+
   const generateReport = async () => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const response = await fetch("/api/reports", {
@@ -644,7 +662,7 @@ export default function Home() {
 
         {page === "dashboard" && <DashboardView monthlyNearMisses={monthlyNearMisses} totalNearMisses={totalNearMisses} monthlyEngineerGrowth={monthlyEngineerGrowth} totalEngineerPower={appState.totalXp} monthlyRegistrationFeedback={monthlyRegistrationFeedback} engineerAssessment={engineerAssessment} registrationTrend={registrationTrend} engineerTrend={engineerTrend} />}
         {page === "create" && <CreateView form={form} setForm={setForm} showOptional={showOptional} setShowOptional={setShowOptional} onSubmit={submitNearMiss} messages={draftMessages} chatInput={chatInput} setChatInput={setChatInput} sendDraftMessage={sendDraftMessage} resetDraftDiscussion={resetDraftDiscussion} />}
-        {page === "list" && <ListView items={listItems} searchText={searchText} setSearchText={setSearchText} listKindFilter={listKindFilter} setListKindFilter={setListKindFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} selectNearMiss={reopenNearMissInCreate} />}
+        {page === "list" && <ListView items={listItems} searchText={searchText} setSearchText={setSearchText} listKindFilter={listKindFilter} setListKindFilter={setListKindFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} selectNearMiss={reopenNearMissInCreate} deleteItem={deleteListItem} />}
         {page === "quests" && <QuestView registerSkill={registerSkill} />}
         {page === "achievements" && <AchievementView registerAchievement={registerAchievement} />}
         {page === "reports" && <ReportView reports={savedReports} generateReport={generateReport} />}
@@ -792,13 +810,15 @@ function CreateView({ form, setForm, showOptional, setShowOptional, onSubmit, me
   );
 }
 
-function ListView({ items, searchText, setSearchText, listKindFilter, setListKindFilter, statusFilter, setStatusFilter, selectNearMiss }: { items: SearchListItem[]; searchText: string; setSearchText: (value: string) => void; listKindFilter: ListKind; setListKindFilter: (value: ListKind) => void; statusFilter: "all" | NearMissStatus; setStatusFilter: (value: "all" | NearMissStatus) => void; selectNearMiss: (id: string) => void }) {
+function ListView({ items, searchText, setSearchText, listKindFilter, setListKindFilter, statusFilter, setStatusFilter, selectNearMiss, deleteItem }: { items: SearchListItem[]; searchText: string; setSearchText: (value: string) => void; listKindFilter: ListKind; setListKindFilter: (value: ListKind) => void; statusFilter: "all" | NearMissStatus; setStatusFilter: (value: "all" | NearMissStatus) => void; selectNearMiss: (id: string) => void; deleteItem: (item: SearchListItem) => void }) {
+  const [searchInput, setSearchInput] = useState(searchText);
+
   return (
     <section className="card stack">
-      <div className="inline-row">
-        <label><span className="help">キーワード検索</span><input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="タイトル、内容、AI判定理由" /></label>
-        <button className="ghost"><Search size={17} />検索</button>
-      </div>
+      <form className="inline-row" onSubmit={(event) => { event.preventDefault(); setSearchText(searchInput); }}>
+        <label><span className="help">キーワード検索</span><input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="タイトル、内容、AI判定理由、日付" /></label>
+        <button className="ghost" type="submit"><Search size={17} />検索</button>
+      </form>
       <div className="tabs">
         {(["all", "knowledge", "skill", "achievement"] as const).map((kind) => <button key={kind} className={`chip ${listKindFilter === kind ? "active" : ""}`} onClick={() => setListKindFilter(kind)}>{listKindLabels[kind]}</button>)}
       </div>
@@ -806,7 +826,8 @@ function ListView({ items, searchText, setSearchText, listKindFilter, setListKin
         {(["all", "considering", "completed"] as const).map((status) => <button key={status} className={`chip ${statusFilter === status ? "active" : ""}`} onClick={() => setStatusFilter(status)}>{status === "all" ? "全ステータス" : nearMissStatusLabels[status]}</button>)}
       </div>
       <div className="list">
-        {items.map((item) => <button key={item.id} className="list-item" onClick={() => item.nearMissId ? selectNearMiss(item.nearMissId) : undefined}><div><div className="list-title"><span className={`kind-badge ${item.kind}`}>{listKindLabels[item.kind]}</span><strong>{item.title}</strong></div><p className="subtle">{item.summary}</p><span className="small">{item.meta}</span></div><span className="point-pills"><span className={`point-pill ${item.kind === "skill" ? "skill" : item.kind === "achievement" ? "achievement" : ""}`}>{getListItemPointLabel(item)}</span></span></button>)}
+        {items.map((item) => <article key={item.id} className="list-item"><button className="list-item-open" type="button" onClick={() => item.nearMissId ? selectNearMiss(item.nearMissId) : undefined}><div><div className="list-title"><span className={`kind-badge ${item.kind}`}>{listKindLabels[item.kind]}</span><strong>{item.title}</strong></div><p className="subtle">{item.summary}</p><span className="small">{item.meta}</span></div></button><span className="point-pills"><span className={`point-pill ${item.kind === "skill" ? "skill" : item.kind === "achievement" ? "achievement" : ""}`}>{getListItemPointLabel(item)}</span><button className="delete-icon" type="button" aria-label={`${item.title}を削除`} title="削除" onClick={() => deleteItem(item)}><Trash2 size={17} /></button></span></article>)}
+        {items.length === 0 && <div className="empty slim">条件に一致する登録データはありません。</div>}
       </div>
     </section>
   );
@@ -972,16 +993,22 @@ function getListItemPointLabel(item: SearchListItem) {
 }
 
 function buildSearchListItems(appState: AppState, searchText: string, kindFilter: ListKind, statusFilter: "all" | NearMissStatus): SearchListItem[] {
-  const query = searchText.trim().toLowerCase();
-  const matches = (values: string[]) => !query || values.join(" ").toLowerCase().includes(query);
+  const normalize = (value: string) => value.normalize("NFKC").toLocaleLowerCase("ja").replace(/\s+/g, " ").trim();
+  const queryWords = normalize(searchText).split(" ").filter(Boolean);
+  const matches = (values: Array<string | number | null | undefined>) => {
+    if (queryWords.length === 0) return true;
+    const haystack = normalize(values.filter((value) => value != null).join(" "));
+    return queryWords.every((word) => haystack.includes(word));
+  };
   const items: SearchListItem[] = [];
 
   if (kindFilter === "all" || kindFilter === "knowledge") {
     items.push(...appState.nearMisses.filter((nearMiss) => {
       const status = deriveNearMissStatus(nearMiss);
-      return (statusFilter === "all" || status === statusFilter) && matches([nearMiss.workContext, nearMiss.description, nearMiss.aiSummary, nearMiss.categories.join(" ")]);
+      return (statusFilter === "all" || status === statusFilter) && matches([nearMiss.workContext, nearMiss.description, nearMiss.potentialImpact, nearMiss.perceivedCause, nearMiss.detectionTrigger, nearMiss.userCountermeasure, nearMiss.aiSummary, nearMiss.knowledgePointReason, nearMiss.categories.join(" "), nearMiss.occurredAt, nearMiss.knowledgePoints, nearMiss.riskLevel, status]);
     }).map((nearMiss) => ({
       id: `knowledge-${nearMiss.id}`,
+      recordId: nearMiss.id,
       kind: "knowledge" as const,
       title: nearMiss.workContext,
       summary: nearMiss.aiSummary,
@@ -993,8 +1020,9 @@ function buildSearchListItems(appState: AppState, searchText: string, kindFilter
   }
 
   if (statusFilter === "all" && (kindFilter === "all" || kindFilter === "skill")) {
-    items.push(...(appState.acquiredSkills ?? []).filter((skill) => matches([skill.title, skill.reason])).map((skill) => ({
+    items.push(...(appState.acquiredSkills ?? []).filter((skill) => matches([skill.title, skill.reason, skill.acquiredAt, skill.points])).map((skill) => ({
       id: `skill-${skill.id}`,
+      recordId: skill.id,
       kind: "skill" as const,
       title: skill.title,
       summary: skill.reason,
@@ -1004,8 +1032,9 @@ function buildSearchListItems(appState: AppState, searchText: string, kindFilter
   }
 
   if (statusFilter === "all" && (kindFilter === "all" || kindFilter === "achievement")) {
-    items.push(...(appState.achievementRecords ?? []).filter((achievement) => matches([achievement.title, achievement.reason])).map((achievement) => ({
+    items.push(...(appState.achievementRecords ?? []).filter((achievement) => matches([achievement.title, achievement.reason, achievement.achievedAt, achievement.points])).map((achievement) => ({
       id: `achievement-${achievement.id}`,
+      recordId: achievement.id,
       kind: "achievement" as const,
       title: achievement.title,
       summary: achievement.reason,

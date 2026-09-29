@@ -413,6 +413,32 @@ details.report-item summary {
   align-items: center;
 }
 
+.list-item-open {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.delete-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(166 47 43 / 24%);
+  border-radius: 8px;
+  color: var(--danger);
+  background: #fff;
+}
+
+.delete-icon:hover {
+  color: #fff;
+  background: var(--danger);
+}
+
 .list-title {
   display: flex;
   align-items: center;
