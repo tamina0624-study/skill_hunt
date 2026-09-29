@@ -2,9 +2,9 @@
   "version": 1,
   "functions": {
     "/api/health": {},
+    "/api/ai": {},
     "/api/achievements": {},
     "/api/skills": {},
-    "/api/ai": {},
     "/api/knowledge": {},
     "/api/reports": {}
   }

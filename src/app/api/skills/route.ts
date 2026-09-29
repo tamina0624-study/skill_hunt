@@ -31,6 +31,16 @@ function judgeSkillPoints(title: string) {
   return { points: 10, reason: 'AI判定: 新しく言語化されたスキルとして10SPです。' };
 }
 
+function readAiEvaluation(payload: Record<string, unknown>) {
+  const value = payload.aiEvaluation;
+  if (!value || typeof value !== 'object') return null;
+  const evaluation = value as Record<string, unknown>;
+  const points = Number(evaluation.points);
+  const reason = String(evaluation.reason ?? '').trim();
+  if (!Number.isFinite(points) || !reason) return null;
+  return { points: Math.round(Math.max(0, Math.min(100, points))), reason };
+}
+
 export async function GET() {
   const user = await getDemoUser();
   const skills = await prisma.acquiredSkill.findMany({
@@ -50,7 +60,7 @@ export async function POST(request: Request) {
   }
 
   const user = await getDemoUser();
-  const judgment = judgeSkillPoints(title);
+  const judgment = readAiEvaluation(payload) ?? judgeSkillPoints(title);
 
   const skill = await prisma.acquiredSkill.create({
     data: {

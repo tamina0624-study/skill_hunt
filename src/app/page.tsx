@@ -142,6 +142,20 @@ type AiFeedback = {
   riskLevel?: RiskLevel;
 };
 
+const readAiFeedback = (form: HTMLFormElement): AiFeedback | undefined => {
+  const data = new FormData(form);
+  const points = Number(data.get("aiPoints"));
+  const reason = String(data.get("aiReason") ?? "").trim();
+  const riskLevel = String(data.get("aiRiskLevel") ?? "");
+
+  if (!Number.isFinite(points) || !reason) return undefined;
+  return {
+    points,
+    reason,
+    riskLevel: ["low", "medium", "high", "critical"].includes(riskLevel) ? riskLevel as RiskLevel : undefined,
+  };
+};
+
 type AppState = {
   userEmail: string;
   totalXp: number;
@@ -481,6 +495,7 @@ export default function Home() {
 
   const submitNearMiss = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const aiEvaluation = readAiFeedback(event.currentTarget);
     if (!form.workContext.trim() || !form.description.trim() || !form.confidentialityConfirmed) {
       return;
     }
@@ -508,6 +523,7 @@ export default function Home() {
         detectability: inferredDetectability,
         rpn: risk.rpn,
         riskLevel: risk.riskLevel,
+        aiEvaluation,
       }),
     });
 
@@ -541,7 +557,7 @@ export default function Home() {
     setChatInput("");
   };
 
-  const registerSkill = async (title: string, yearMonth: string) => {
+  const registerSkill = async (title: string, yearMonth: string, aiEvaluation?: AiFeedback) => {
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
 
@@ -551,6 +567,7 @@ export default function Home() {
       body: JSON.stringify({
         title: cleanTitle,
         yearMonth,
+        aiEvaluation,
       }),
     });
 
@@ -560,7 +577,7 @@ export default function Home() {
     }
   };
 
-  const registerAchievement = async (title: string, yearMonth: string) => {
+  const registerAchievement = async (title: string, yearMonth: string, aiEvaluation?: AiFeedback) => {
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
 
@@ -570,6 +587,7 @@ export default function Home() {
       body: JSON.stringify({
         title: cleanTitle,
         yearMonth,
+        aiEvaluation,
       }),
     });
 
@@ -833,12 +851,12 @@ function ListView({ items, searchText, setSearchText, listKindFilter, setListKin
   );
 }
 
-function QuestView({ registerSkill }: { registerSkill: (title: string, yearMonth: string) => void }) {
+function QuestView({ registerSkill }: { registerSkill: (title: string, yearMonth: string, aiEvaluation?: AiFeedback) => void }) {
   const [skillText, setSkillText] = useState("");
   const [skillYearMonth, setSkillYearMonth] = useState(currentMonthInput);
 
   return (
-    <form className="card stack" onSubmit={(event) => { event.preventDefault(); registerSkill(skillText, skillYearMonth); setSkillText(""); }}>
+    <form className="card stack" onSubmit={(event) => { event.preventDefault(); registerSkill(skillText, skillYearMonth, readAiFeedback(event.currentTarget)); setSkillText(""); }}>
       <label>年月<input type="month" value={skillYearMonth} onChange={(event) => setSkillYearMonth(event.target.value)} /></label>
       <textarea className="large-entry" value={skillText} onChange={(event) => setSkillText(event.target.value)} placeholder="身についたスキルを入力" />
       <AiFeedbackPreview kind="skill" pointUnit="SP" title={skillText} content={skillText} extraContext={{ yearMonth: skillYearMonth }} />
@@ -847,12 +865,12 @@ function QuestView({ registerSkill }: { registerSkill: (title: string, yearMonth
   );
 }
 
-function AchievementView({ registerAchievement }: { registerAchievement: (title: string, yearMonth: string) => void }) {
+function AchievementView({ registerAchievement }: { registerAchievement: (title: string, yearMonth: string, aiEvaluation?: AiFeedback) => void }) {
   const [achievementText, setAchievementText] = useState("");
   const [achievementYearMonth, setAchievementYearMonth] = useState(currentMonthInput);
 
   return (
-    <form className="card stack" onSubmit={(event) => { event.preventDefault(); registerAchievement(achievementText, achievementYearMonth); setAchievementText(""); }}>
+    <form className="card stack" onSubmit={(event) => { event.preventDefault(); registerAchievement(achievementText, achievementYearMonth, readAiFeedback(event.currentTarget)); setAchievementText(""); }}>
       <label>年月<input type="month" value={achievementYearMonth} onChange={(event) => setAchievementYearMonth(event.target.value)} /></label>
       <textarea className="large-entry" value={achievementText} onChange={(event) => setAchievementText(event.target.value)} placeholder="達成した実績を入力" />
       <AiFeedbackPreview kind="achievement" pointUnit="AP" title={achievementText} content={achievementText} extraContext={{ yearMonth: achievementYearMonth }} />
@@ -903,6 +921,11 @@ function AiFeedbackPreview({ kind, pointUnit, title, content, extraContext }: { 
         <p>{feedback.reason}</p>
         {isStale && <small>入力内容が変更されています。最新の内容で再評価してください。</small>}
       </div>}
+      {feedback && !isStale && <>
+        <input type="hidden" name="aiPoints" value={feedback.points} />
+        <input type="hidden" name="aiReason" value={feedback.reason} />
+        <input type="hidden" name="aiRiskLevel" value={feedback.riskLevel ?? ""} />
+      </>}
       {error && <p className="feedback-error">{error}</p>}
     </section>
   );
