@@ -28,6 +28,92 @@ skill hant は、日々の業務経験を「ナレッジ」「スキル」「実
 
 現在の実装は、Next.js + Prisma + Supabase PostgreSQL を前提とした DB 連携版の MVP です。
 
+## システム構成
+
+```mermaid
+flowchart LR
+  User[利用者] --> UI[Next.js / React画面]
+  UI <--> Store[(ブラウザ localStorage)]
+  UI -->|APIリクエスト| Routes[Route Handlers<br/>knowledge / skills / achievements / reports / ai]
+  Routes -->|データ操作| Prisma[Prisma Client]
+  Prisma --> DB[(Supabase PostgreSQL)]
+  Routes -->|評価要求| Evaluator[AI評価処理]
+  Evaluator -->|APIキー設定時| OpenRouter[OpenRouter API]
+  Evaluator -. APIキー未設定または呼び出し失敗 .-> Fallback[fallback評価]
+```
+
+画面は登録状態の保存・復元に `localStorage` を使い、業務データの取得・保存はRoute Handler経由でPostgreSQLと連携します。AI評価はOpenRouterを利用できない場合、アプリ内のfallback評価に切り替わります。
+
+## DBテーブル構成
+
+Prisma schemaのモデルと主なリレーションは次のとおりです。テーブル名は `@@map` で指定された名前、フィールド名はPrisma schema上の名前で記載しています。
+
+```mermaid
+erDiagram
+  USERS ||--o{ KNOWLEDGE_ENTRIES : owns
+  USERS ||--o{ ACQUIRED_SKILLS : owns
+  USERS ||--o{ ACHIEVEMENT_RECORDS : owns
+  USERS ||--o{ MONTHLY_REPORTS : owns
+  USERS ||--o{ POINT_EVENTS : records
+  KNOWLEDGE_ENTRIES o|--o{ POINT_EVENTS : awards
+  ACQUIRED_SKILLS o|--o{ POINT_EVENTS : awards
+  ACHIEVEMENT_RECORDS o|--o{ POINT_EVENTS : awards
+
+  USERS {
+    uuid id PK
+    string email UK
+    int totalEp
+  }
+  KNOWLEDGE_ENTRIES {
+    uuid id PK
+    uuid userId FK
+    text content
+    int knowledgePoints
+  }
+  ACQUIRED_SKILLS {
+    uuid id PK
+    uuid userId FK
+    string title
+    text description
+    int points
+  }
+  ACHIEVEMENT_RECORDS {
+    uuid id PK
+    uuid userId FK
+    string title
+    int points
+  }
+  MONTHLY_REPORTS {
+    uuid id PK
+    uuid userId FK
+    string periodKey
+    json snapshotJson
+  }
+  POINT_EVENTS {
+    uuid id PK
+    uuid userId FK
+    enum pointType
+    enum sourceType
+    int points
+    string idempotencyKey UK
+  }
+```
+
+### テーブル概要
+
+| テーブル（Prismaモデル） | 主なフィールド | 制約・用途 |
+|---|---|---|
+| `users` (`User`) | `id`, `email`, `displayName`, `timezone`, `monthlyReportDay`, `monthlyReportTime`, `totalEp`, `createdAt`, `updatedAt` | `email` は一意。利用者情報と累計EP。 |
+| `knowledge_entries` (`KnowledgeEntry`) | `id`, `userId`, `occurredAt`, `content`, `knowledgePoints`, `knowledgePointReason`, `createdAt`, `updatedAt`, `deletedAt` | フォームの年月・本文、KPと判定理由。利用者・発生日にindex。 |
+| `acquired_skills` (`AcquiredSkill`) | `id`, `userId`, `title`, `description`, `confidentialityConfirmed`, `potentialImpact`, `perceivedCause`, `detectionTrigger`, `reuseIdea`, `impactLevel`, `status`, `categories`, `occurrenceScore`, `severityScore`, `detectabilityScore`, `rpn`, `riskLevel`, `points`, `reason`, `acquiredAt` | スキル登録フォームの各項目、SPと判定理由。利用者・取得日にindex。 |
+| `achievement_records` (`AchievementRecord`) | `id`, `userId`, `title`, `points`, `reason`, `achievedAt`, `createdAt` | 実績、APと判定理由。利用者・達成日にindex。 |
+| `monthly_reports` (`MonthlyReport`) | `id`, `userId`, `periodKey`, `periodStart`, `periodEnd`, `generatedAt`, `monthlyTitle`, `monthlyMessage`, `monthlyFocus`, `engineerTitle`, `engineerMessage`, `engineerNextAction`, `snapshotJson` | 月次評価と集計スナップショット。`userId` と `periodKey` の組み合わせは一意。 |
+| `point_events` (`PointEvent`) | `id`, `userId`, `pointType`, `sourceType`, `knowledgeEntryId`, `acquiredSkillId`, `achievementRecordId`, `points`, `reason`, `idempotencyKey`, `createdAt` | ポイント加算履歴と参照元。`idempotencyKey` は一意で二重加算を防止。 |
+
+主なenumは `ImpactLevel`（`none` / `minor` / `occurred`）、`KnowledgeStatus`（`considering` / `completed`）、`RiskLevel`（`low` / `medium` / `high` / `critical`）、`PointType`（`KP` / `SP` / `AP`）、`PointSourceType`（`knowledge` / `skill` / `achievement` / `quest`）です。
+
+既存DBでは `knowledge_entries` の旧リスク・分類・対象列が削除されます。DB同期前に必要な旧データを退避し、バックアップを取得してください。
+
 ## 現在の実装状況
 
 ### 実装済み

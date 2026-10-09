@@ -39,21 +39,66 @@ export async function GET() {
 export async function POST(request: Request) {
   const payload = await request.json();
   const title = String(payload.title ?? '').trim();
+  const description = String(payload.description ?? '').trim();
 
   if (!title) {
     return NextResponse.json({ error: 'title is required' }, { status: 400 });
   }
+  if (payload.confidentialityConfirmed !== true) {
+    return NextResponse.json({ error: 'confidentiality confirmation is required' }, { status: 400 });
+  }
 
   const user = await getDemoUser();
-  const judgment = readAiEvaluation(payload) ?? fallbackEvaluation('skill', title, title);
+  const evaluationContent = [
+    description,
+    payload.potentialImpact,
+    payload.perceivedCause,
+    payload.detectionTrigger,
+    payload.reuseIdea,
+  ].map((value) => String(value ?? '').trim()).filter(Boolean).join('\n');
+  const judgment = readAiEvaluation(payload) ?? fallbackEvaluation('skill', title, evaluationContent);
+  const impactLevel = ['none', 'minor', 'occurred'].includes(String(payload.actualHarm))
+    ? String(payload.actualHarm)
+    : 'none';
+  const status = ['considering', 'completed'].includes(String(payload.status))
+    ? String(payload.status)
+    : 'considering';
+  const riskLevel = ['low', 'medium', 'high', 'critical'].includes(String(payload.riskLevel))
+    ? String(payload.riskLevel)
+    : null;
+  const categories = Array.isArray(payload.categories)
+    ? payload.categories.map(String).slice(0, 5)
+    : [];
+  const score = (value: unknown, fallback: number) => {
+    const number = Number(value);
+    return Number.isInteger(number) && number >= 1 && number <= 5 ? number : fallback;
+  };
+  const occurrenceScore = score(payload.occurrence, 3);
+  const severityScore = score(payload.severity, 3);
+  const detectabilityScore = score(payload.detectability, 3);
+  const rpn = Number(payload.rpn);
 
   const skill = await prisma.acquiredSkill.create({
     data: {
       userId: user.id,
       title,
+      description,
+      confidentialityConfirmed: true,
+      potentialImpact: String(payload.potentialImpact ?? '').trim() || null,
+      perceivedCause: String(payload.perceivedCause ?? '').trim() || null,
+      detectionTrigger: String(payload.detectionTrigger ?? '').trim() || null,
+      reuseIdea: String(payload.reuseIdea ?? '').trim() || null,
+      impactLevel: impactLevel as 'none' | 'minor' | 'occurred',
+      status: status as 'considering' | 'completed',
+      categories,
+      occurrenceScore,
+      severityScore,
+      detectabilityScore,
+      rpn: Number.isInteger(rpn) && rpn >= 1 && rpn <= 125 ? rpn : occurrenceScore * severityScore * detectabilityScore,
+      riskLevel: riskLevel as 'low' | 'medium' | 'high' | 'critical' | null,
       points: judgment.points,
       reason: judgment.reason,
-      acquiredAt: new Date(payload.yearMonth ? `${payload.yearMonth}-01T00:00:00.000Z` : Date.now()),
+      acquiredAt: new Date(payload.occurredAt ?? (payload.yearMonth ? `${payload.yearMonth}-01T00:00:00.000Z` : Date.now())),
     },
   });
 

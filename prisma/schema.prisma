@@ -61,21 +61,7 @@ model KnowledgeEntry {
   id                   String          @id @default(uuid()) @db.Uuid
   userId               String          @db.Uuid
   occurredAt           DateTime        @db.Timestamptz(3)
-  subject              String          @db.VarChar(200)
   content              String
-  potentialImpact      String?
-  perceivedCause       String?
-  detectionTrigger     String?
-  reuseIdea            String?
-  impactLevel          ImpactLevel     @default(none)
-  status               KnowledgeStatus @default(considering)
-  categories           String[]        @default([])
-  occurrenceScore      Int?            @db.SmallInt
-  severityScore        Int?            @db.SmallInt
-  detectabilityScore   Int?            @db.SmallInt
-  rpn                  Int?            @db.SmallInt
-  riskLevel            RiskLevel?
-  summary              String
   knowledgePoints      Int             @default(0)
   knowledgePointReason String
   createdAt            DateTime        @default(now()) @db.Timestamptz(3)
@@ -85,19 +71,32 @@ model KnowledgeEntry {
   pointEvents          PointEvent[]
 
   @@index([userId, occurredAt(sort: Desc)])
-  @@index([userId, status])
   @@map("knowledge_entries")
 }
 
 model AcquiredSkill {
-  id         String       @id @default(uuid()) @db.Uuid
-  userId     String       @db.Uuid
-  title      String
-  points     Int          @default(0)
-  reason     String
-  acquiredAt DateTime     @db.Timestamptz(3)
-  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String         @id @default(uuid()) @db.Uuid
+  userId             String         @db.Uuid
+  title              String
+  description        String         @default("")
+  confidentialityConfirmed Boolean  @default(false)
+  potentialImpact    String?
+  perceivedCause     String?
+  detectionTrigger   String?
+  reuseIdea          String?
+  impactLevel        ImpactLevel    @default(none)
+  status             KnowledgeStatus @default(considering)
+  categories         String[]       @default([])
+  occurrenceScore    Int?           @db.SmallInt
+  severityScore      Int?           @db.SmallInt
+  detectabilityScore Int?           @db.SmallInt
+  rpn                Int?           @db.SmallInt
+  riskLevel          RiskLevel?
+  points             Int            @default(0)
+  reason             String
+  acquiredAt         DateTime       @db.Timestamptz(3)
+  createdAt          DateTime       @default(now()) @db.Timestamptz(3)
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   pointEvents PointEvent[]
 
   @@index([userId, acquiredAt(sort: Desc)])

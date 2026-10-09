@@ -57,9 +57,9 @@ skill-hant/
 |---|---|---|
 | Auth | デモログイン | `src/app/page.tsx` |
 | Dashboard | 件数、EP、推移、評価コメント表示 | `DashboardView` |
-| Knowledge | ナレッジ登録、KP評価 | `CreateView`, `AiFeedbackPreview`, `/api/ai`, `/api/knowledge` |
+| Knowledge | 獲得ナレッジ登録、KP評価 | `QuestView`, `AiFeedbackPreview`, `registerKnowledge`, `/api/knowledge` |
 | AI Memo | 入力中ナレッジの整理メモ | `sendDraftMessage`, `buildDraftCoachReply` |
-| Skill | 獲得スキル登録、SP評価 | `QuestView`, `AiFeedbackPreview`, `/api/ai`, `/api/skills` |
+| Skill | スキル登録、SP評価、フォーム詳細保存 | `CreateView`, `AiFeedbackPreview`, `registerSkill`, `/api/skills` |
 | Achievement | 実績登録、AP評価 | `AchievementView`, `AiFeedbackPreview`, `/api/ai`, `/api/achievements` |
 | List | 種別横断検索 | `ListView`, `buildSearchListItems` |
 | Report | 月次レポート作成・保存・表示 | `ReportView`, `buildAiReport` |
