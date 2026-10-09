@@ -190,9 +190,9 @@ const nearMissStatusLabels: Record<NearMissStatus, string> = { considering: "検
 const listKindLabels: Record<ListKind, string> = { all: "全て", knowledge: "ナレッジ", skill: "スキル", achievement: "実績" };
 const pageTitles: Record<PageKey, string> = {
   dashboard: "ダッシュボード",
-  create: "ナレッジ登録",
+  create: "獲得スキル",
   list: "登録一覧",
-  quests: "獲得スキル",
+  quests: "ナレッジ登録",
   achievements: "実績登録",
   reports: "レポート",
   settings: "設定",
@@ -486,7 +486,7 @@ export default function Home() {
     setShowOptional(false);
     setDraftMessages(initialDraftMessages);
     setChatInput("");
-    setPage("create");
+    setPage("quests");
   };
 
   const reopenNearMissInCreate = (id: string) => {
@@ -497,7 +497,7 @@ export default function Home() {
     setShowOptional(true);
     setDraftMessages([]);
     setChatInput("");
-    setPage("create");
+    setPage("quests");
   };
 
   const submitNearMiss = async (event: FormEvent<HTMLFormElement>) => {
@@ -539,7 +539,7 @@ export default function Home() {
     setForm(blankForm());
     setShowOptional(false);
     setDraftMessages(initialDraftMessages);
-    setPage("create");
+    setPage("quests");
   };
 
   const sendDraftMessage = (text: string) => {
@@ -659,8 +659,8 @@ export default function Home() {
         <div className="brand"><span className="brand-mark"><ShieldCheck size={21} /></span><span>skill hant</span></div>
         <nav className="nav" aria-label="主ナビゲーション">
           <NavButton icon={<BarChart3 size={18} />} label="ダッシュボード" active={page === "dashboard"} onClick={() => setPage("dashboard")} />
-          <NavButton icon={<Plus size={18} />} label="ナレッジ登録" active={page === "create"} onClick={startNewDraft} />
-          <NavButton icon={<Swords size={18} />} label="獲得スキル" active={page === "quests"} onClick={() => setPage("quests")} />
+          <NavButton icon={<Swords size={18} />} label="獲得スキル" active={page === "create"} onClick={() => setPage("create")} />
+          <NavButton icon={<Plus size={18} />} label="ナレッジ登録" active={page === "quests"} onClick={startNewDraft} />
           <NavButton icon={<Trophy size={18} />} label="実績登録" active={page === "achievements"} onClick={() => setPage("achievements")} />
           <NavButton icon={<ListChecks size={18} />} label="一覧" active={page === "list"} onClick={() => setPage("list")} />
           <NavButton icon={<CalendarClock size={18} />} label="レポート" active={page === "reports"} onClick={() => setPage("reports")} />
@@ -683,9 +683,9 @@ export default function Home() {
         </header>
 
         {page === "dashboard" && <DashboardView monthlyNearMisses={monthlyNearMisses} totalNearMisses={totalNearMisses} monthlyEngineerGrowth={monthlyEngineerGrowth} totalEngineerPower={appState.totalXp} monthlyRegistrationFeedback={monthlyRegistrationFeedback} engineerAssessment={engineerAssessment} registrationTrend={registrationTrend} engineerTrend={engineerTrend} />}
-        {page === "create" && <CreateView form={form} setForm={setForm} showOptional={showOptional} setShowOptional={setShowOptional} onSubmit={submitNearMiss} messages={draftMessages} chatInput={chatInput} setChatInput={setChatInput} sendDraftMessage={sendDraftMessage} resetDraftDiscussion={resetDraftDiscussion} />}
+        {page === "create" && <QuestView registerSkill={registerSkill} />}
         {page === "list" && <ListView items={listItems} searchText={searchText} setSearchText={setSearchText} listKindFilter={listKindFilter} setListKindFilter={setListKindFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} selectNearMiss={reopenNearMissInCreate} deleteItem={deleteListItem} />}
-        {page === "quests" && <QuestView registerSkill={registerSkill} />}
+        {page === "quests" && <CreateView form={form} setForm={setForm} showOptional={showOptional} setShowOptional={setShowOptional} onSubmit={submitNearMiss} messages={draftMessages} chatInput={chatInput} setChatInput={setChatInput} sendDraftMessage={sendDraftMessage} resetDraftDiscussion={resetDraftDiscussion} />}
         {page === "achievements" && <AchievementView registerAchievement={registerAchievement} />}
         {page === "reports" && <ReportView reports={savedReports} generateReport={generateReport} />}
         {page === "settings" && <SettingsView />}
