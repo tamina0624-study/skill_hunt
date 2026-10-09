@@ -148,7 +148,7 @@ const readAiFeedback = (form: HTMLFormElement): AiFeedback | undefined => {
   const reason = String(data.get("aiReason") ?? "").trim();
   const riskLevel = String(data.get("aiRiskLevel") ?? "");
 
-  if (!Number.isFinite(points) || !reason) return undefined;
+  if (!Number.isInteger(points) || points < 0 || points > 100 || !reason) return undefined;
   return {
     points,
     reason,
@@ -1254,37 +1254,6 @@ function buildEngineerTrend(quests: Quest[], acquiredSkills: AcquiredSkill[], ne
   return points;
 }
 
-function judgeKnowledgePoints(form: DraftForm, riskLevel: RiskLevel) {
-  const text = `${form.workContext} ${form.description} ${form.potentialImpact} ${form.perceivedCause} ${form.detectionTrigger} ${form.userCountermeasure}`;
-  let points = 10;
-  const reasons = ["気づきをナレッジとして記録できています"];
-
-  if (form.description.length >= 30) {
-    points += 10;
-    reasons.push("起こりそうだったことが具体的です");
-  }
-  if (form.detectionTrigger.trim()) {
-    points += 10;
-    reasons.push("発見契機が残っており再利用しやすいです");
-  }
-  if (form.perceivedCause.trim()) {
-    points += 10;
-    reasons.push("原因仮説があり改善につなげやすいです");
-  }
-  if (/チェック|レビュー|自動|検証|監視|手順|防止/.test(text)) {
-    points += 10;
-    reasons.push("対策につながる語彙が含まれています");
-  }
-  if (["high", "critical"].includes(riskLevel)) {
-    points += 10;
-    reasons.push("高リスクの気づきを早めに言語化できています");
-  }
-
-  return {
-    points: Math.min(points, 60),
-    reason: `AI判定: ${reasons.join("。 ")}。`,
-  };
-}
 
 function formatShortDate(value: string) {
   const date = new Date(value);

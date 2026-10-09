@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { fallbackEvaluation } from '../../../lib/ai';
 import { prisma } from '../../../lib/prisma';
 
 export const runtime = 'nodejs';
@@ -15,46 +16,14 @@ async function getDemoUser() {
   });
 }
 
-function calculateKnowledgePoints(payload: Record<string, unknown>) {
-  const text = `${String(payload.workContext ?? '')} ${String(payload.description ?? '')} ${String(payload.potentialImpact ?? '')} ${String(payload.perceivedCause ?? '')} ${String(payload.detectionTrigger ?? '')} ${String(payload.userCountermeasure ?? '')}`;
-  let points = 10;
-  const reasons: string[] = ['気づきをナレッジとして記録できています'];
-
-  if (String(payload.description ?? '').length >= 30) {
-    points += 10;
-    reasons.push('起こりそうだったことが具体的です');
-  }
-  if (String(payload.detectionTrigger ?? '').trim()) {
-    points += 10;
-    reasons.push('発見契機が残っており再利用しやすいです');
-  }
-  if (String(payload.perceivedCause ?? '').trim()) {
-    points += 10;
-    reasons.push('原因仮説があり改善につなげやすいです');
-  }
-  if (/チェック|レビュー|自動|検証|監視|手順|防止/.test(text)) {
-    points += 10;
-    reasons.push('対策につながる語彙が含まれています');
-  }
-  if (['high', 'critical'].includes(String(payload.riskLevel ?? ''))) {
-    points += 10;
-    reasons.push('高リスクの気づきを早めに言語化できています');
-  }
-
-  return {
-    points: Math.min(points, 60),
-    reason: `AI判定: ${reasons.join('。 ')}。`,
-  };
-}
-
 function readAiEvaluation(payload: Record<string, unknown>) {
   const value = payload.aiEvaluation;
   if (!value || typeof value !== 'object') return null;
   const evaluation = value as Record<string, unknown>;
-  const points = Number(evaluation.points);
+  const points = evaluation.points;
   const reason = String(evaluation.reason ?? '').trim();
-  if (!Number.isFinite(points) || !reason) return null;
-  return { points: Math.round(Math.max(0, Math.min(100, points))), reason };
+  if (typeof points !== 'number' || !Number.isInteger(points) || points < 0 || points > 100 || !reason) return null;
+  return { points, reason };
 }
 
 export async function GET() {
@@ -110,10 +79,14 @@ export async function POST(request: Request) {
     ? String(payload.riskLevel ?? 'low')
     : 'low';
 
-  const judgment = readAiEvaluation(payload) ?? calculateKnowledgePoints({
-    ...payload,
-    riskLevel,
-  });
+  const knowledgeDetails = [
+    content,
+    payload.potentialImpact,
+    payload.perceivedCause,
+    payload.detectionTrigger,
+    payload.userCountermeasure,
+  ].map((value) => String(value ?? '').trim()).filter(Boolean).join('\n');
+  const judgment = readAiEvaluation(payload) ?? fallbackEvaluation('knowledge', subject, knowledgeDetails);
 
   const entry = await prisma.knowledgeEntry.create({
     data: {

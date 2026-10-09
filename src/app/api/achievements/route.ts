@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { fallbackEvaluation } from '../../../lib/ai';
 import { prisma } from '../../../lib/prisma';
 
 export const runtime = 'nodejs';
@@ -15,30 +16,14 @@ async function getDemoUser() {
   });
 }
 
-function judgeAchievementPoints(title: string) {
-  const normalized = title.toLowerCase();
-
-  if (/障害|本番|リリース|改善|自動|削減|解決|復旧|設計/.test(normalized)) {
-    return { points: 50, reason: 'AI判定: 影響の大きい成果または改善実績として50APです。' };
-  }
-  if (/レビュー|共有|資料|標準化|手順|教育|支援|提案/.test(normalized)) {
-    return { points: 30, reason: 'AI判定: チームや将来の作業に再利用できる実績として30APです。' };
-  }
-  if (/対応|確認|調査|整理|記録/.test(normalized)) {
-    return { points: 20, reason: 'AI判定: 日々の業務改善につながる実績として20APです。' };
-  }
-
-  return { points: 10, reason: 'AI判定: 実績として記録された行動に10APです。' };
-}
-
 function readAiEvaluation(payload: Record<string, unknown>) {
   const value = payload.aiEvaluation;
   if (!value || typeof value !== 'object') return null;
   const evaluation = value as Record<string, unknown>;
-  const points = Number(evaluation.points);
+  const points = evaluation.points;
   const reason = String(evaluation.reason ?? '').trim();
-  if (!Number.isFinite(points) || !reason) return null;
-  return { points: Math.round(Math.max(0, Math.min(100, points))), reason };
+  if (typeof points !== 'number' || !Number.isInteger(points) || points < 0 || points > 100 || !reason) return null;
+  return { points, reason };
 }
 
 export async function GET() {
@@ -60,7 +45,7 @@ export async function POST(request: Request) {
   }
 
   const user = await getDemoUser();
-  const judgment = readAiEvaluation(payload) ?? judgeAchievementPoints(title);
+  const judgment = readAiEvaluation(payload) ?? fallbackEvaluation('achievement', title, title);
 
   const item = await prisma.achievementRecord.create({
     data: {

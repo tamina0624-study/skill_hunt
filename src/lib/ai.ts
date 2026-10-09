@@ -10,35 +10,30 @@ export type EvaluationResult = {
 
 const scoringRubrics: Record<EvaluationKind, string> = {
   knowledge: [
-    '採点順に評価し、各項目の根拠が入力にない場合は加点しない。',
-    '1. 基礎点10KP。ナレッジとして気づきが記録されている。',
-    '2. +10KP。状況や気づきが具体的である。',
-    '3. +10KP。発見契機が明確である。',
-    '4. +10KP。原因の認識がある。',
-    '5. +10KP。次に活かす工夫や対策がある。',
-    '6. +10KP。リスク目安がhighまたはcriticalである。',
-    '合計は10KP刻み、最大60KP。',
+    '知識の深さ、専門性、習得難易度を1件単独で評価し、複数の点数を加算しない。',
+    '0〜20点: 基本用語や概要の理解。',
+    '21〜40点: 基礎的な仕組みの理解。',
+    '41〜60点: 専門的な知識や原理の理解。',
+    '61〜80点: 高度な専門知識、複雑な設計知識。',
+    '81〜100点: 非常に高度な専門知識、難関資格。',
+    '資格取得の場合は試験範囲、知識の深さ、問題の難易度を考慮する。資格難易度の目安: Sランク85〜100点、Aランク70〜84点、Bランク50〜69点、Cランク30〜49点、Dランク10〜29点。',
   ].join('\n'),
   skill: [
-    '次の順に確認し、最初に該当した最も高い段階だけを採用する。加算はしない。',
-    '1. 50SP: 自動化、テスト、監視、CI/CD、スクリプト、lint、検証。',
-    '2. 30SP: 設計、レビュー、分析、改善、再発防止、原因分析、要件、仕様。',
-    '3. 20SP: 確認、手順、チェック、共有、記録、整理。',
-    '4. いずれにも該当しない場合は10SP。',
+    '実際に技術を使用する能力、作業の難易度、自律性を1件単独で評価する。',
+    '0〜20点: 手順書に従った基本操作。',
+    '21〜40点: 基本作業を一部自力で実施。',
+    '41〜60点: 一般的な作業を自力で完遂。',
+    '61〜80点: 高度な設計・構築・障害対応。',
+    '81〜100点: 非常に高度な技術力、複雑な問題解決、技術指導。',
   ].join('\n'),
   achievement: [
-    '次の順に確認し、最初に該当した最も高い段階だけを採用する。加算はしない。',
-    '1. 50AP: 障害、本番、リリース、改善、自動化、削減、解決、復旧、設計に関わる成果。',
-    '2. 30AP: レビュー、共有、資料、標準化、手順、教育、支援、提案など、チームや将来に再利用できる成果。',
-    '3. 20AP: 対応、確認、調査、整理、記録など、日々の業務改善につながる成果。',
-    '4. いずれにも該当しない場合は10AP。',
+    '達成した成果の規模、難易度、影響度、本人の貢献度を1件単独で評価する。',
+    '0〜20点: 学習成果、簡単な制作物。',
+    '21〜40点: 小規模な開発や改善実績。',
+    '41〜60点: 業務システム開発、明確な成果。',
+    '61〜80点: 高度なプロジェクト、大きな改善成果。',
+    '81〜100点: 非常に高度な実績、組織やサービスへの大きな貢献。',
   ].join('\n'),
-};
-
-const allowedPointValues: Record<EvaluationKind, number[]> = {
-  knowledge: [10, 20, 30, 40, 50, 60],
-  skill: [10, 20, 30, 50],
-  achievement: [10, 20, 30, 50],
 };
 
 export function fallbackEvaluation(kind: EvaluationKind, title: string, content: string): EvaluationResult {
@@ -47,58 +42,66 @@ export function fallbackEvaluation(kind: EvaluationKind, title: string, content:
   const text = `${normalizedTitle} ${normalizedContent}`.toLowerCase();
 
   if (kind === 'knowledge') {
-    let points = 10;
-    const reasons: string[] = ['気づきを記録できています'];
-
-    if (normalizedContent.length >= 30) {
-      points += 10;
-      reasons.push('具体的な内容が書かれています');
+    const rankMatch = /([sabcd])ランク/i.exec(text);
+    const qualification = /資格|試験|認定|certificate|certification|exam/i.test(text);
+    if (qualification && rankMatch) {
+      const rankScores: Record<string, number> = { s: 92, a: 77, b: 60, c: 40, d: 20 };
+      const rank = rankMatch[1].toLowerCase();
+      return { points: rankScores[rank], reason: `AI判定: 記載された${rank.toUpperCase()}ランク資格として評価しました。` };
     }
-    if (/検知|発見|確認|照合|監視|レビュー|手順/.test(text)) {
-      points += 10;
-      reasons.push('再利用しやすい発見契機が含まれています');
+    if (/難関資格|非常に高度|最先端の専門知識/.test(text)) {
+      return { points: 90, reason: 'AI判定: 非常に高度な専門知識または難関資格の記載があります。' };
     }
-    if (/原因|対策|防止|改善|再発/.test(text)) {
-      points += 10;
-      reasons.push('原因と対策につながる記述になっています');
+    if (/高度な専門知識|高度な設計|複雑な設計知識/.test(text)) {
+      return { points: 70, reason: 'AI判定: 高度な専門知識または複雑な設計知識の記載があります。' };
     }
-    if (/本番|重大|影響|停止|障害|事故/.test(text)) {
-      points += 10;
-      reasons.push('高リスクに関わる知見として価値があります');
+    if (/専門的な知識|専門知識|原理|内部動作/.test(text)) {
+      return { points: 50, reason: 'AI判定: 専門的な知識や原理の記載があります。' };
     }
-
-    return {
-      points: Math.min(points, 60),
-      reason: `AI判定: ${reasons.join('。 ')}。`,
-      riskLevel: points >= 40 ? 'high' : points >= 25 ? 'medium' : 'low',
-    };
+    if (/基礎的な仕組み|基本的な仕組み|仕組みの理解|構造の理解/.test(text)) {
+      return { points: 30, reason: 'AI判定: 基礎的な仕組みの理解が記載されています。' };
+    }
+    if (/基本用語|概要|用語の理解|入門/.test(text)) {
+      return { points: 15, reason: 'AI判定: 基本用語や概要の理解として評価しました。' };
+    }
+    return { points: 10, reason: 'AI判定: 具体的な知識の深さを確認できないため控えめに評価しました。' };
   }
 
   if (kind === 'skill') {
-    if (/自動|テスト|監視|ci|cd|script|スクリプト|lint|検証/.test(text)) {
-      return { points: 50, reason: 'AI判定: 自動化や検証の仕組みに関わるスキルのため50SPです。' };
+    if (/技術指導|指導した|複雑な問題を解決|難解な問題を解決|mentor|mentoring|complex problem solving/i.test(text)) {
+      return { points: 90, reason: 'AI判定: 複雑な問題解決または技術指導の記載があります。' };
     }
-    if (/設計|レビュー|分析|改善|再発|原因|要件|仕様/.test(text)) {
-      return { points: 30, reason: 'AI判定: 設計、分析、レビューに関わる再利用しやすいスキルのため30SPです。' };
+    if (/高度な設計|高度な構築|障害対応を主導|大規模障害|advanced design|incident response/i.test(text)) {
+      return { points: 70, reason: 'AI判定: 高度な設計・構築または障害対応の記載があります。' };
     }
-    if (/確認|手順|チェック|共有|記録|整理/.test(text)) {
-      return { points: 20, reason: 'AI判定: 作業品質を安定させる基本スキルのため20SPです。' };
+    if (/一部自力|基本作業を実施|設定変更|基本的な実装|partially independently/i.test(text)) {
+      return { points: 30, reason: 'AI判定: 基本作業の一部を自力で実施した記載があります。' };
     }
-
-    return { points: 10, reason: 'AI判定: 新しく言語化されたスキルとして10SPです。' };
-  }
-
-  if (/障害|本番|リリース|改善|自動|削減|解決|復旧|設計/.test(text)) {
-    return { points: 50, reason: 'AI判定: 影響の大きい成果または改善実績として50APです。' };
-  }
-  if (/レビュー|共有|資料|標準化|手順|教育|支援|提案/.test(text)) {
-    return { points: 30, reason: 'AI判定: チームや将来の作業に再利用できる実績として30APです。' };
-  }
-  if (/対応|確認|調査|整理|記録/.test(text)) {
-    return { points: 20, reason: 'AI判定: 日々の業務改善につながる実績として20APです。' };
+    if (/自力で完遂|自力で実施|独力で|一人で完遂|independently completed/i.test(text)) {
+      return { points: 50, reason: 'AI判定: 一般的な作業を自力で完遂した記載があります。' };
+    }
+    if (/手順書に従|手順通り|基本操作|手順に沿って|followed the instructions/i.test(text)) {
+      return { points: 15, reason: 'AI判定: 手順書に従った基本操作の記載があります。' };
+    }
+    return { points: 10, reason: 'AI判定: 実際の使用能力や自律性を確認できないため控えめに評価しました。' };
   }
 
-  return { points: 10, reason: 'AI判定: 実績として記録された行動に10APです。' };
+  if (/組織全体|全社|サービス全体|業界全体|大きな貢献|organization-wide|service-wide/i.test(text)) {
+    return { points: 90, reason: 'AI判定: 組織やサービス全体への大きな貢献が記載されています。' };
+  }
+  if (/高度なプロジェクト|大規模プロジェクト|大幅な改善|大きな改善|significant improvement|large-scale project/i.test(text)) {
+    return { points: 70, reason: 'AI判定: 高度なプロジェクトまたは大きな改善成果が記載されています。' };
+  }
+  if (/業務システム|明確な成果|定量的な成果|削減率|工数を.*削減|business system|measurable result/i.test(text)) {
+    return { points: 50, reason: 'AI判定: 業務システム開発または明確な成果が記載されています。' };
+  }
+  if (/小規模な開発|小規模開発|個人開発|簡単な改善|small project|personal project/i.test(text)) {
+    return { points: 30, reason: 'AI判定: 小規模な開発や改善実績が記載されています。' };
+  }
+  if (/学習成果|学習した|簡単な制作物|簡単なツール|learning outcome|simple prototype/i.test(text)) {
+    return { points: 15, reason: 'AI判定: 学習成果または簡単な制作物として評価しました。' };
+  }
+  return { points: 10, reason: 'AI判定: 成果の規模や影響を確認できないため控えめに評価しました。' };
 }
 
 export async function evaluateRecord(
@@ -129,7 +132,7 @@ export async function evaluateRecord(
           {
             role: 'system',
             content:
-              'You are a precise engineering productivity evaluator. Follow the provided scoring rubric in order, award points only when supported by the input, and use only the rubric\'s listed point values. Return only JSON with keys: points, reason, riskLevel. riskLevel must be low|medium|high|critical. Always write reason in natural Japanese, regardless of the input language.',
+              'You are an engineering evaluator. Evaluate exactly one registered record of the requested kind. Give exactly one integer score from 0 to 100 and a concise Japanese reason. Use this record as evidence of what the person knows, can do, or achieved. You may use public facts about a qualification explicitly named in this record to judge its exam scope and difficulty, but do not assume it was passed or held unless stated. Never add points for other registrations, qualifications, experience, or abilities not stated in this record. Consider technical difficulty, do not reward years of experience alone, and score conservatively when details are insufficient. Return only JSON with keys points, reason, riskLevel. points must be an integer from 0 through 100. riskLevel, if included, must be low|medium|high|critical. Always write reason in natural Japanese.',
           },
           {
             role: 'user',
@@ -157,9 +160,9 @@ export async function evaluateRecord(
     const raw = data.choices?.[0]?.message?.content ?? '{}';
     const parsed = JSON.parse(raw) as Partial<EvaluationResult>;
 
-    if (typeof parsed.points === 'number' && allowedPointValues[kind].includes(Math.round(parsed.points))) {
+    if (typeof parsed.points === 'number' && Number.isInteger(parsed.points) && parsed.points >= 0 && parsed.points <= 100) {
       return {
-        points: Math.round(parsed.points),
+        points: parsed.points,
         reason: typeof parsed.reason === 'string' ? parsed.reason : 'AI判定: この記録から価値が高いと評価しました。',
         riskLevel: parsed.riskLevel as EvaluationResult['riskLevel'] | undefined,
       };
