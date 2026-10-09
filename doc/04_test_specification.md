@@ -1,4 +1,4 @@
-# Safety Quest テスト仕様書
+# skill hant テスト仕様書
 
 ## 1. 目的
 

@@ -212,6 +212,13 @@ const calculateRisk = (occurrence: number, severity: number, detectability: numb
   return { rpn, riskLevel };
 };
 
+const calculateKnowledgeRisk = (form: DraftForm) => {
+  const occurrence = form.userCountermeasure.includes("注意") ? 4 : 3;
+  const severity = form.actualHarm === "occurred" ? 5 : form.potentialImpact ? 4 : 3;
+  const detectability = form.detectionTrigger ? 3 : 4;
+  return { occurrence, severity, detectability, ...calculateRisk(occurrence, severity, detectability) };
+};
+
 const levelFromXp = (totalXp: number) => Math.floor(Math.sqrt(totalXp / 100)) + 1;
 
 const maskSecrets = (value: string) =>
@@ -499,10 +506,7 @@ export default function Home() {
     if (!form.workContext.trim() || !form.description.trim() || !form.confidentialityConfirmed) {
       return;
     }
-    const inferredOccurrence = form.userCountermeasure.includes("注意") ? 4 : 3;
-    const inferredSeverity = form.actualHarm === "occurred" ? 5 : form.potentialImpact ? 4 : 3;
-    const inferredDetectability = form.detectionTrigger ? 3 : 4;
-    const risk = calculateRisk(inferredOccurrence, inferredSeverity, inferredDetectability);
+    const risk = calculateKnowledgeRisk(form);
 
     const response = await fetch("/api/knowledge", {
       method: "POST",
@@ -518,9 +522,9 @@ export default function Home() {
         detectionTrigger: form.detectionTrigger.trim(),
         userCountermeasure: form.userCountermeasure.trim(),
         categories: inferCategories(form),
-        occurrence: inferredOccurrence,
-        severity: inferredSeverity,
-        detectability: inferredDetectability,
+        occurrence: risk.occurrence,
+        severity: risk.severity,
+        detectability: risk.detectability,
         rpn: risk.rpn,
         riskLevel: risk.riskLevel,
         aiEvaluation,
@@ -652,7 +656,7 @@ export default function Home() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark"><ShieldCheck size={21} /></span><span>Safety Quest</span></div>
+        <div className="brand"><span className="brand-mark"><ShieldCheck size={21} /></span><span>skill hant</span></div>
         <nav className="nav" aria-label="主ナビゲーション">
           <NavButton icon={<BarChart3 size={18} />} label="ダッシュボード" active={page === "dashboard"} onClick={() => setPage("dashboard")} />
           <NavButton icon={<Plus size={18} />} label="ナレッジ登録" active={page === "create"} onClick={startNewDraft} />
@@ -699,7 +703,7 @@ function LoginView({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>)
         <p className="subtle">ナレッジ、スキル、実績をAI評価でポイント化し、エンジニア力として可視化します。</p>
       </section>
       <form className="login-card stack" onSubmit={onSubmit}>
-        <span className="badge">SAFETY QUEST</span>
+        <span className="badge">skill hant</span>
         <h2>ログイン</h2>
         <label>メールアドレス<input name="email" type="email" defaultValue="yoshida@example.com" required /></label>
         <button className="primary" type="submit"><ShieldCheck size={18} />はじめる</button>
@@ -807,7 +811,7 @@ function CreateView({ form, setForm, showOptional, setShowOptional, onSubmit, me
           pointUnit="KP"
           title={form.workContext}
           content={draftContext}
-          extraContext={{ actualHarm: form.actualHarm, status: form.status }}
+          extraContext={{ actualHarm: form.actualHarm, status: form.status, riskLevel: calculateKnowledgeRisk(form).riskLevel }}
         />
         <div className="form-actions"><span className="help">必須項目と機密情報確認が完了すると登録できます。</span><button className="primary" type="submit"><Sparkles size={18} />この内容で登録</button></div>
       </form>

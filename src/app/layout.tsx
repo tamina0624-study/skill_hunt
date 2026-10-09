@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Safety Quest",
+  title: "skill hant",
   description: "ヒヤリハットを改善クエストへ変えるAIコーチ",
 };
 

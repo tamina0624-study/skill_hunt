@@ -1,4 +1,4 @@
-# Safety Quest 詳細設計書
+# skill hant 詳細設計書
 
 ## 1. 共通規約
 

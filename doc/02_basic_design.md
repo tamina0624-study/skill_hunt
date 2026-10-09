@@ -1,4 +1,4 @@
-# Safety Quest 基本設計書
+# skill hant 基本設計書
 
 ## 1. 設計方針
 
@@ -28,7 +28,7 @@ flowchart TD
 ## 3. フォルダ構成
 
 ```text
-safety-quest/
+skill-hant/
   src/
     app/
       layout.tsx
