@@ -264,19 +264,6 @@ const blankForm = (): DraftForm => ({
   confidentialityConfirmed: false,
 });
 
-const formFromNearMiss = (nearMiss: KnowledgeEntry): DraftForm => ({
-  occurredAt: nearMiss.recordedAt,
-  workContext: nearMiss.content.slice(0, 200),
-  description: nearMiss.content,
-  potentialImpact: "",
-  perceivedCause: "",
-  detectionTrigger: "",
-  userCountermeasure: "",
-  actualHarm: "none",
-  status: "considering",
-  confidentialityConfirmed: true,
-});
-
 const refreshServerState = async (fallbackState: AppState = initialState): Promise<AppState> => {
   try {
     const [knowledgeResponse, skillResponse, achievementResponse] = await Promise.all([
@@ -446,17 +433,6 @@ export default function Home() {
     setForm(blankForm());
     setShowOptional(false);
     setDraftMessages(initialDraftMessages);
-    setChatInput("");
-    setPage("quests");
-  };
-
-  const reopenNearMissInCreate = (id: string) => {
-    const nearMiss = appState.nearMisses.find((item) => item.id === id);
-    if (!nearMiss) return;
-    setAppState((current) => ({ ...current, selectedId: id }));
-    setForm(formFromNearMiss(nearMiss));
-    setShowOptional(true);
-    setDraftMessages([]);
     setChatInput("");
     setPage("quests");
   };
@@ -638,7 +614,7 @@ export default function Home() {
 
         {page === "dashboard" && <DashboardView monthlyNearMisses={monthlyNearMisses} totalNearMisses={totalNearMisses} monthlyEngineerGrowth={monthlyEngineerGrowth} totalEngineerPower={appState.totalXp} monthlyRegistrationFeedback={monthlyRegistrationFeedback} engineerAssessment={engineerAssessment} registrationTrend={registrationTrend} engineerTrend={engineerTrend} />}
         {page === "create" && <QuestView registerKnowledge={registerKnowledge} />}
-        {page === "list" && <ListView items={listItems} searchText={searchText} setSearchText={setSearchText} listKindFilter={listKindFilter} setListKindFilter={setListKindFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} selectNearMiss={reopenNearMissInCreate} deleteItem={deleteListItem} />}
+        {page === "list" && <ListView items={listItems} searchText={searchText} setSearchText={setSearchText} listKindFilter={listKindFilter} setListKindFilter={setListKindFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} deleteItem={deleteListItem} />}
         {page === "quests" && <CreateView form={form} setForm={setForm} showOptional={showOptional} setShowOptional={setShowOptional} onSubmit={submitSkillFromKnowledgeForm} messages={draftMessages} chatInput={chatInput} setChatInput={setChatInput} sendDraftMessage={sendDraftMessage} resetDraftDiscussion={resetDraftDiscussion} />}
         {page === "achievements" && <AchievementView registerAchievement={registerAchievement} />}
         {page === "reports" && <ReportView reports={savedReports} generateReport={generateReport} />}
@@ -810,7 +786,7 @@ function CreateView({ form, setForm, showOptional, setShowOptional, onSubmit, me
   );
 }
 
-function ListView({ items, searchText, setSearchText, listKindFilter, setListKindFilter, statusFilter, setStatusFilter, selectNearMiss, deleteItem }: { items: SearchListItem[]; searchText: string; setSearchText: (value: string) => void; listKindFilter: ListKind; setListKindFilter: (value: ListKind) => void; statusFilter: "all" | NearMissStatus; setStatusFilter: (value: "all" | NearMissStatus) => void; selectNearMiss: (id: string) => void; deleteItem: (item: SearchListItem) => void }) {
+function ListView({ items, searchText, setSearchText, listKindFilter, setListKindFilter, statusFilter, setStatusFilter, deleteItem }: { items: SearchListItem[]; searchText: string; setSearchText: (value: string) => void; listKindFilter: ListKind; setListKindFilter: (value: ListKind) => void; statusFilter: "all" | NearMissStatus; setStatusFilter: (value: "all" | NearMissStatus) => void; deleteItem: (item: SearchListItem) => void }) {
   const [searchInput, setSearchInput] = useState(searchText);
 
   return (
@@ -826,7 +802,7 @@ function ListView({ items, searchText, setSearchText, listKindFilter, setListKin
         {(["all", "considering", "completed"] as const).map((status) => <button key={status} className={`chip ${statusFilter === status ? "active" : ""}`} onClick={() => setStatusFilter(status)}>{status === "all" ? "全ステータス" : nearMissStatusLabels[status]}</button>)}
       </div>
       <div className="list">
-        {items.map((item) => <article key={item.id} className="list-item"><button className="list-item-open" type="button" onClick={() => item.nearMissId ? selectNearMiss(item.nearMissId) : undefined}><div><div className="list-title"><span className={`kind-badge ${item.kind}`}>{listKindLabels[item.kind]}</span><strong>{item.title}</strong></div><p className="subtle">{item.summary}</p><span className="small">{item.meta}</span></div></button><span className="point-pills"><span className={`point-pill ${item.kind === "skill" ? "skill" : item.kind === "achievement" ? "achievement" : ""}`}>{getListItemPointLabel(item)}</span><button className="delete-icon" type="button" aria-label={`${item.title}を削除`} title="削除" onClick={() => deleteItem(item)}><Trash2 size={17} /></button></span></article>)}
+        {items.map((item) => <article key={item.id} className="list-item"><div className="list-item-open" aria-label={`${item.title}の詳細`}><div><div className="list-title"><span className={`kind-badge ${item.kind}`}>{listKindLabels[item.kind]}</span><strong>{item.title}</strong></div><p className="subtle">{item.summary}</p><span className="small">{item.meta}</span></div></div><span className="point-pills"><span className={`point-pill ${item.kind === "skill" ? "skill" : item.kind === "achievement" ? "achievement" : ""}`}>{getListItemPointLabel(item)}</span><button className="delete-icon" type="button" aria-label={`${item.title}を削除`} title="削除" onClick={() => deleteItem(item)}><Trash2 size={17} /></button></span></article>)}
         {items.length === 0 && <div className="empty slim">条件に一致する登録データはありません。</div>}
       </div>
     </section>
