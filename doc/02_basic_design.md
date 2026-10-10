@@ -15,6 +15,7 @@
 | ORM | Prisma schema定義済み | Prisma Client |
 | AI | 疑似AIルール | AI Adapter経由の実API |
 | 認証 | デモログイン | Auth.js等 |
+| コミット前検査 | GitSecurityTool submodule + pre-commit | 検知ルールの運用に応じて調整 |
 
 ```mermaid
 flowchart TD
@@ -42,14 +43,21 @@ skill-hant/
     03_detailed_design.md
     04_test_specification.md
     05_current_database_design.md
+  GitSecurityTool/          # GitSecurityTool submodule
+  GitSecurityTool-keywords.example.yaml
+  .gitmodules
+  .pre-commit-config.yaml
   gui_mock/
     *.html
+  .gitignore
   package.json
   tsconfig.json
   next.config.ts
 ```
 
 `node_modules` と `.next` は依存物・生成物であり、`src` 配下には置かない。
+
+GitSecurityToolはアプリケーションの実行時機能ではなく、開発時のコミット前検査としてルートの `.pre-commit-config.yaml` から実行する。ソースはGit submoduleで参照し、サブモジュールを含めたチェックアウトが必要。
 
 ## 4. モジュール構成
 
@@ -63,6 +71,7 @@ skill-hant/
 | Achievement | 実績登録、AP評価 | `AchievementView`, `AiFeedbackPreview`, `/api/ai`, `/api/achievements` |
 | List | 種別横断検索 | `ListView`, `buildSearchListItems` |
 | Report | 月次レポート作成・保存・表示 | `ReportView`, `buildAiReport` |
+| Git Security | コミット前の機密情報・基本ファイル検査 | `.pre-commit-config.yaml`, `GitSecurityTool` submodule |
 | Settings | タイムゾーン、月次通知表示、初期化 | `SettingsView` |
 | DB Schema | PostgreSQL移行用DB定義 | `prisma/schema.prisma` |
 

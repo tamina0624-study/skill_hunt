@@ -1,0 +1,55 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.2
+    hooks:
+      - id: gitleaks
+        args:
+          - --verbose
+          - --redact
+          - --config=GitSecurityTool/GitSecurityTool/.gitleaks.toml
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+
+  - repo: local
+    hooks:
+      - id: block-env-files
+        name: Block .env files
+        entry: python GitSecurityTool/GitSecurityTool/block_secret.py --mode env
+        language: system
+        pass_filenames: false
+      - id: block-secret-paths
+        name: Block secret paths
+        entry: python GitSecurityTool/GitSecurityTool/block_secret.py --mode secret
+        language: system
+        pass_filenames: false
+      - id: block-personal-email
+        name: Block personal email
+        entry: python GitSecurityTool/GitSecurityTool/block_secret.py --mode personal_email
+        language: system
+        pass_filenames: false
+      - id: block-my-name
+        name: Block personal name
+        entry: python GitSecurityTool/GitSecurityTool/block_secret.py --mode my_name
+        language: system
+        pass_filenames: false
+      - id: block-company
+        name: Block company name
+        entry: python GitSecurityTool/GitSecurityTool/block_secret.py --mode company
+        language: system
+        pass_filenames: false
+      - id: block-windows-path
+        name: Block local paths
+        entry: python GitSecurityTool/GitSecurityTool/block_secret.py --mode windows_path
+        language: system
+        pass_filenames: false
+      - id: aggregate-security-logs
+        name: Aggregate security logs
+        entry: python GitSecurityTool/GitSecurityTool/block_secret.py --mode log_aggregator
+        language: system
+        pass_filenames: false

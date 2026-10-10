@@ -1,5 +1,29 @@
 # skill hant
 
+## こんな困りごとはありませんか？
+
+- 日々の業務で得た学びや工夫を記録しそびれ、あとから思い出せない
+- できるようになったことが整理されず、自分の成長を説明しにくい
+- 次に何を振り返り、伸ばせばよいのか分からない
+
+skill hant は、業務で得た経験を「ナレッジ」「スキル」「実績」として記録し、成長の振り返りを支援するツールです。
+
+| 困りごと | skill hantでできること |
+|---|---|
+| 学びや経験が散らばり、振り返れない | ナレッジ・スキル・実績を登録し、一覧検索でまとめて確認できます。 |
+| 成長が見えず、説明しにくい | 各記録をポイント（KP / SP / AP）で評価し、合計のEPや推移をダッシュボードで確認できます。 |
+| 次の行動が決めにくい | 月次レポートで登録内容を振り返り、評価や次のアクションを確認できます。 |
+
+## ドキュメント・設計書
+
+- [要件定義書](doc/01_requirements_specification.md)
+- [基本設計書](doc/02_basic_design.md)
+- [詳細設計書](doc/03_detailed_design.md)
+- [テスト仕様書](doc/04_test_specification.md)
+- [現行DB設計書](doc/05_current_database_design.md)
+- [プロジェクト作成ルール](./プロジェクト作成ルール)
+- [プロンプト集](prompts.txt)
+
 ## GUI
 
 ### ログイン
@@ -237,6 +261,9 @@ erDiagram
 │   ├── 04_test_specification.md
 │   └── 05_current_database_design.md
 ├── gui_mock/                   # UI モック
+├── GitSecurityTool/            # GitSecurityTool submodule
+│   └── GitSecurityTool/        # 検知スクリプトと設定
+├── GitSecurityTool-keywords.example.yaml # 独自検知語設定のテンプレート
 ├── prisma/
 │   └── schema.prisma           # Prisma schema
 ├── src/
@@ -255,6 +282,8 @@ erDiagram
 │       ├── ai.ts
 │       └── prisma.ts
 ├── .gitignore
+├── .gitmodules
+├── .pre-commit-config.yaml
 ├── eslint.config.mjs
 ├── next-env.d.ts
 ├── next.config.ts
@@ -306,6 +335,32 @@ npm run dev
 ```text
 http://localhost:3000
 ```
+
+## GitSecurityTool（コミット前チェック）
+
+[GitSecurityTool](https://github.com/tamina0624-study/GitSecurityTool) をGit submoduleとして組み込み、コミット前にgitleaks、基本ファイルチェック、独自の機密情報チェックを実行します。サブモジュールを含めて取得し、Python 3.11以上の環境でフックを設定してください。
+
+新規にcloneする場合は `git clone --recurse-submodules <repository-url>` を使ってください。すでにclone済みの場合は次のコマンドでサブモジュールを取得します。
+
+```bash
+git submodule update --init --recursive
+python -m pip install pre-commit
+python -m pre_commit install
+```
+
+全ファイルを手動で検査する場合:
+
+```bash
+python -m pre_commit run --all-files
+```
+
+独自チェックの設定はGitSecurityTool側の `keywords.yaml` を読み込みます。初回はサンプルをコピーし、会社名・氏名・個人メール・秘密情報に関する語を必要に応じてローカルで追加してください。
+
+```bash
+cp GitSecurityTool-keywords.example.yaml GitSecurityTool/GitSecurityTool/keywords.yaml
+```
+
+`keywords.yaml` は個人・会社固有の情報を含むローカル専用ファイルです。GitSecurityToolサブモジュール内の `.git/info/exclude` に `GitSecurityTool/keywords.yaml` と `GitSecurityTool/.secret_detected.log` を追加し、設定値や検知ログをコミットしないでください。
 
 ## ビルド
 
