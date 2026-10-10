@@ -376,6 +376,18 @@ npm run db:generate
 npx prisma db push
 ```
 
+テーブルを現行のPrismaスキーマから作り直す場合は、次のコマンドを実行します。この操作は接続先データベース内の既存データをすべて削除するため、事前に `DATABASE_URL` を確認し、必要なデータをバックアップしてください。スキーマ検証後に確認入力を求め、`REBUILD DATABASE` と入力した場合のみ再構築します。本番・CI環境では実行できません。
+
+```bash
+npm run db:rebuild
+```
+
+開発環境で自動実行する場合は、環境変数 `REBUILD_DATABASE=1` を設定します。この場合、対話確認を省略して再構築します。データを削除する操作であることを確認し、接続先を確認してから設定してください。本番・CI環境の実行禁止はこの設定でも変わりません。
+
+```bash
+REBUILD_DATABASE=1 npm run db:rebuild
+```
+
 ## デプロイ手順
 
 ### 推奨構成: Vercel + Supabase

@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:validate": "prisma validate",
-    "db:generate": "prisma generate --schema=./prisma/schema.prisma"
+    "db:generate": "prisma generate --schema=./prisma/schema.prisma",
+    "db:rebuild": "node scripts/rebuild-db.cjs"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",
