@@ -373,8 +373,17 @@ npm run build
 ```bash
 npm run db:validate
 npm run db:generate
+npm run db:repair
 npx prisma db push
 ```
+
+既存データを保持したまま、旧DB構造との不整合（`acquired_skills.description` の追加と、旧 `knowledge_entries.subject` 列へのデフォルト値設定）を修復する場合は、`DATABASE_URL` が対象DBを指していることを確認してから次を実行します。このSQLは再実行可能で、既存レコードを削除しません。
+
+```bash
+npm run db:repair
+```
+
+アプリ起動時に同じ非破壊修復を自動適用するには、実行環境の環境変数に `REBUILD_DATABASE=1` を設定してください。Next.jsのNode.jsサーバー起動時に修復を行い、ビルド中とEdge Runtimeでは実行しません。この設定はテーブルを削除・再作成せず、データも削除しません。修復に失敗した場合は起動エラーとして表面化します。
 
 テーブルを現行のPrismaスキーマから作り直す場合は、次のコマンドを実行します。この操作は接続先データベース内の既存データをすべて削除するため、事前に `DATABASE_URL` を確認し、必要なデータをバックアップしてください。スキーマ検証後に確認入力を求め、`REBUILD DATABASE` と入力した場合のみ再構築します。本番・CI環境では実行できません。
 

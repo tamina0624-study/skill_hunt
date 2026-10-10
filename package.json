@@ -10,6 +10,7 @@
     "lint": "next lint",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate --schema=./prisma/schema.prisma",
+    "db:repair": "prisma db execute --schema=./prisma/schema.prisma --file=./prisma/repair-existing-db.sql",
     "db:rebuild": "node scripts/rebuild-db.cjs"
   },
   "dependencies": {
