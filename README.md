@@ -377,7 +377,7 @@ npm run db:repair
 npx prisma db push
 ```
 
-既存データを保持したまま、旧DB構造との不整合（`acquired_skills` の `description` / `confidentialityConfirmed` / `potentialImpact` / `perceivedCause` / `detectionTrigger` / `reuseIdea` 列の追加と、旧 `knowledge_entries.subject` / `summary` 列へのデフォルト値設定）を修復する場合は、`DATABASE_URL` が対象DBを指していることを確認してから次を実行します。このSQLは再実行可能で、既存レコードを削除しません。
+既存データを保持したまま、旧DB構造との不整合（`acquired_skills` の現行スキーマに必要な列・enum型の追加と、旧 `knowledge_entries.subject` / `summary` 列へのデフォルト値設定）を修復する場合は、`DATABASE_URL` が対象DBを指していることを確認してから次を実行します。このSQLは再実行可能で、既存レコードを削除しません。
 
 ```bash
 npm run db:repair
