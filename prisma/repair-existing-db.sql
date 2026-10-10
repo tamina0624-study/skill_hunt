@@ -4,6 +4,12 @@ ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
 ALTER TABLE public.acquired_skills
 ADD COLUMN IF NOT EXISTS "confidentialityConfirmed" BOOLEAN NOT NULL DEFAULT FALSE;
 
+ALTER TABLE public.acquired_skills
+ADD COLUMN IF NOT EXISTS "potentialImpact" TEXT,
+ADD COLUMN IF NOT EXISTS "perceivedCause" TEXT,
+ADD COLUMN IF NOT EXISTS "detectionTrigger" TEXT,
+ADD COLUMN IF NOT EXISTS "reuseIdea" TEXT;
+
 DO $repair$
 BEGIN
   IF EXISTS (
