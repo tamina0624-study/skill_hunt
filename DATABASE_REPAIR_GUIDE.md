@@ -89,7 +89,7 @@ export async function register() {
 
 **Repairs applied**:
 - Adds missing columns (e.g., `description` on `acquired_skills`)
-- Sets sensible defaults for legacy fields
+- Sets defaults for legacy `knowledge_entries.subject` and `knowledge_entries.summary` fields
 - Never drops columns or modifies existing data
 
 ### 3. On-Demand: Manual Repair Command
@@ -117,6 +117,8 @@ Null constraint violation on the fields: (`field_name`)
 ```
 **Cause**: Required fields missing from input or database default not set.
 **Fix**: Ensure API calls provide all required fields, or apply repairs to set defaults.
+
+If the error names the legacy `knowledge_entries.summary` column, run `npm run db:repair` or restart with `REBUILD_DATABASE=1`. This sets a default for that old column without changing existing records.
 
 ## Deployment
 

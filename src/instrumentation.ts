@@ -36,5 +36,22 @@ export async function register() {
     );
   }
 
+  const [legacySummary] = await prisma.$queryRaw<{ exists: boolean }[]>(
+    Prisma.sql`SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'knowledge_entries'
+        AND column_name = 'summary'
+    ) AS "exists"`,
+  );
+
+  if (legacySummary.exists) {
+    await prisma.$executeRaw(
+      Prisma.sql`ALTER TABLE public.knowledge_entries
+        ALTER COLUMN summary SET DEFAULT ''`,
+    );
+  }
+
   console.info('REBUILD_DATABASE=1: database repairs completed.');
 }
