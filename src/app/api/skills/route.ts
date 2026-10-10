@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-import { fallbackEvaluation } from '../../../lib/ai';
 import { prisma } from '../../../lib/prisma';
 
 export const runtime = 'nodejs';
@@ -48,15 +47,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'confidentiality confirmation is required' }, { status: 400 });
   }
 
+  const judgment = readAiEvaluation(payload);
+  if (!judgment) {
+    return NextResponse.json({ error: 'A current AI evaluation is required' }, { status: 400 });
+  }
+
   const user = await getDemoUser();
-  const evaluationContent = [
-    description,
-    payload.potentialImpact,
-    payload.perceivedCause,
-    payload.detectionTrigger,
-    payload.reuseIdea,
-  ].map((value) => String(value ?? '').trim()).filter(Boolean).join('\n');
-  const judgment = readAiEvaluation(payload) ?? fallbackEvaluation('skill', title, evaluationContent);
   const impactLevel = ['none', 'minor', 'occurred'].includes(String(payload.actualHarm))
     ? String(payload.actualHarm)
     : 'none';

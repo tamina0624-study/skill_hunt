@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-import { fallbackEvaluation } from '../../../lib/ai';
 import { prisma } from '../../../lib/prisma';
 
 export const runtime = 'nodejs';
@@ -44,8 +43,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'title is required' }, { status: 400 });
   }
 
+  const judgment = readAiEvaluation(payload);
+  if (!judgment) {
+    return NextResponse.json({ error: 'A current AI evaluation is required' }, { status: 400 });
+  }
+
   const user = await getDemoUser();
-  const judgment = readAiEvaluation(payload) ?? fallbackEvaluation('achievement', title, title);
 
   const item = await prisma.achievementRecord.create({
     data: {

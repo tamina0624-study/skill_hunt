@@ -461,8 +461,8 @@ export default function Home() {
   const submitSkillFromKnowledgeForm = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const aiEvaluation = readAiFeedback(event.currentTarget);
-    if (!form.workContext.trim() || !form.description.trim() || !form.confidentialityConfirmed) {
-      return;
+    if (!aiEvaluation || !form.workContext.trim() || !form.description.trim() || !form.confidentialityConfirmed) {
+      throw new Error("A current AI evaluation is required before registration.");
     }
     await registerSkill(form, aiEvaluation);
 
@@ -491,9 +491,9 @@ export default function Home() {
     setChatInput("");
   };
 
-  const registerSkill = async (skillForm: DraftForm, aiEvaluation?: AiFeedback) => {
+  const registerSkill = async (skillForm: DraftForm, aiEvaluation: AiFeedback) => {
     const title = skillForm.workContext.trim();
-    if (!title) return;
+    if (!title) throw new Error("Skill title is required.");
     const risk = calculateKnowledgeRisk(skillForm);
 
     const response = await fetch("/api/skills", {
@@ -520,15 +520,14 @@ export default function Home() {
       }),
     });
 
-    if (response.ok) {
-      const refreshed = await refreshServerState(appState);
-      setAppState(refreshed);
-    }
+    if (!response.ok) throw new Error(`Skill registration failed with status ${response.status}.`);
+    const refreshed = await refreshServerState(appState);
+    setAppState(refreshed);
   };
 
-  const registerKnowledge = async (title: string, yearMonth: string, aiEvaluation?: AiFeedback) => {
+  const registerKnowledge = async (title: string, yearMonth: string, aiEvaluation: AiFeedback) => {
     const cleanTitle = title.trim();
-    if (!cleanTitle) return;
+    if (!cleanTitle) throw new Error("Knowledge content is required.");
 
     const response = await fetch("/api/knowledge", {
       method: "POST",
@@ -540,15 +539,14 @@ export default function Home() {
       }),
     });
 
-    if (response.ok) {
-      const refreshed = await refreshServerState(appState);
-      setAppState(refreshed);
-    }
+    if (!response.ok) throw new Error(`Knowledge registration failed with status ${response.status}.`);
+    const refreshed = await refreshServerState(appState);
+    setAppState(refreshed);
   };
 
-  const registerAchievement = async (title: string, yearMonth: string, aiEvaluation?: AiFeedback) => {
+  const registerAchievement = async (title: string, yearMonth: string, aiEvaluation: AiFeedback) => {
     const cleanTitle = title.trim();
-    if (!cleanTitle) return;
+    if (!cleanTitle) throw new Error("Achievement title is required.");
 
     const response = await fetch("/api/achievements", {
       method: "POST",
@@ -560,10 +558,9 @@ export default function Home() {
       }),
     });
 
-    if (response.ok) {
-      const refreshed = await refreshServerState(appState);
-      setAppState(refreshed);
-    }
+    if (!response.ok) throw new Error(`Achievement registration failed with status ${response.status}.`);
+    const refreshed = await refreshServerState(appState);
+    setAppState(refreshed);
   };
 
   const deleteListItem = async (item: SearchListItem) => {
@@ -749,12 +746,34 @@ function TrendLineChart({ points, unit, ariaLabel, gradientId }: { points: Trend
   );
 }
 
-function CreateView({ form, setForm, showOptional, setShowOptional, onSubmit, messages, chatInput, setChatInput, sendDraftMessage, resetDraftDiscussion }: { form: DraftForm; setForm: (form: DraftForm) => void; showOptional: boolean; setShowOptional: (value: boolean) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; messages: ChatMessage[]; chatInput: string; setChatInput: (value: string) => void; sendDraftMessage: (text: string) => void; resetDraftDiscussion: () => void }) {
+function CreateView({ form, setForm, showOptional, setShowOptional, onSubmit, messages, chatInput, setChatInput, sendDraftMessage, resetDraftDiscussion }: { form: DraftForm; setForm: (form: DraftForm) => void; showOptional: boolean; setShowOptional: (value: boolean) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>; messages: ChatMessage[]; chatInput: string; setChatInput: (value: string) => void; sendDraftMessage: (text: string) => void; resetDraftDiscussion: () => void }) {
   const draftContext = buildDraftContext(form);
+  const [hasCurrentEvaluation, setHasCurrentEvaluation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!hasCurrentEvaluation || !readAiFeedback(event.currentTarget)) {
+      setSubmitError("最新の入力内容でAI評価を取得してから登録してください。");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await onSubmit(event);
+    } catch (error) {
+      console.error("Failed to register skill", error);
+      setSubmitError("登録に失敗しました。入力内容とデータベース接続を確認して、もう一度お試しください。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <section className="create-layout">
-      <form className="card stack create-form" onSubmit={onSubmit}>
+      <form className="card stack create-form" onSubmit={(event) => void submit(event)}>
         <div className="page-head"><div><h2>スキル登録</h2><p className="subtle">経験や気づきを入力すると、スキルポイントをAIが評価します。</p></div></div>
         <div className="two-col">
           <label>発生日時<input type="datetime-local" value={form.occurredAt} onChange={(event) => setForm({ ...form, occurredAt: event.target.value })} required /></label>
@@ -777,8 +796,10 @@ function CreateView({ form, setForm, showOptional, setShowOptional, onSubmit, me
           title={form.workContext}
           content={draftContext}
           extraContext={{ actualHarm: form.actualHarm, status: form.status, riskLevel: calculateKnowledgeRisk(form).riskLevel }}
+          onValidityChange={setHasCurrentEvaluation}
         />
-        <div className="form-actions"><span className="help">必須項目と機密情報確認が完了すると登録できます。</span><button className="primary" type="submit"><Sparkles size={18} />この内容で登録</button></div>
+        {submitError && <p className="feedback-error" role="alert">{submitError}</p>}
+        <div className="form-actions"><span className="help">最新のAI評価を確認し、必須項目と機密情報確認が完了すると登録できます。</span><button className="primary" type="submit" disabled={!hasCurrentEvaluation || isSubmitting || !form.workContext.trim() || !form.description.trim() || !form.confidentialityConfirmed}><Sparkles size={18} />{isSubmitting ? "登録中…" : "この内容で登録"}</button></div>
       </form>
 
       <aside className="card stack create-discussion" aria-label="登録内容についてAIとディスカッション">
@@ -820,41 +841,95 @@ function ListView({ items, searchText, setSearchText, listKindFilter, setListKin
   );
 }
 
-function QuestView({ registerKnowledge }: { registerKnowledge: (title: string, yearMonth: string, aiEvaluation?: AiFeedback) => void }) {
+function QuestView({ registerKnowledge }: { registerKnowledge: (title: string, yearMonth: string, aiEvaluation: AiFeedback) => Promise<void> }) {
   const [skillText, setSkillText] = useState("");
   const [skillYearMonth, setSkillYearMonth] = useState(currentMonthInput);
+  const [hasCurrentEvaluation, setHasCurrentEvaluation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const evaluation = readAiFeedback(event.currentTarget);
+    if (!hasCurrentEvaluation || !evaluation) {
+      setSubmitError("最新の入力内容でAI評価を取得してから登録してください。");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await registerKnowledge(skillText, skillYearMonth, evaluation);
+      setSkillText("");
+    } catch (error) {
+      console.error("Failed to register knowledge", error);
+      setSubmitError("登録に失敗しました。入力内容とデータベース接続を確認して、もう一度お試しください。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <form className="card stack" onSubmit={(event) => { event.preventDefault(); registerKnowledge(skillText, skillYearMonth, readAiFeedback(event.currentTarget)); setSkillText(""); }}>
+    <form className="card stack" onSubmit={(event) => void submit(event)}>
       <label>年月<input type="month" value={skillYearMonth} onChange={(event) => setSkillYearMonth(event.target.value)} /></label>
       <textarea className="large-entry" value={skillText} onChange={(event) => setSkillText(event.target.value)} placeholder="身についたナレッジを入力" />
-      <AiFeedbackPreview kind="knowledge" pointUnit="KP" title={skillText} content={skillText} extraContext={{ yearMonth: skillYearMonth }} />
-      <button className="primary" type="submit">この内容で登録</button>
+      <AiFeedbackPreview kind="knowledge" pointUnit="KP" title={skillText} content={skillText} extraContext={{ yearMonth: skillYearMonth }} onValidityChange={setHasCurrentEvaluation} />
+      {submitError && <p className="feedback-error" role="alert">{submitError}</p>}
+      <button className="primary" type="submit" disabled={!hasCurrentEvaluation || isSubmitting || !skillText.trim()}>{isSubmitting ? "登録中…" : "この内容で登録"}</button>
     </form>
   );
 }
 
-function AchievementView({ registerAchievement }: { registerAchievement: (title: string, yearMonth: string, aiEvaluation?: AiFeedback) => void }) {
+function AchievementView({ registerAchievement }: { registerAchievement: (title: string, yearMonth: string, aiEvaluation: AiFeedback) => Promise<void> }) {
   const [achievementText, setAchievementText] = useState("");
   const [achievementYearMonth, setAchievementYearMonth] = useState(currentMonthInput);
+  const [hasCurrentEvaluation, setHasCurrentEvaluation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const evaluation = readAiFeedback(event.currentTarget);
+    if (!hasCurrentEvaluation || !evaluation) {
+      setSubmitError("最新の入力内容でAI評価を取得してから登録してください。");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await registerAchievement(achievementText, achievementYearMonth, evaluation);
+      setAchievementText("");
+    } catch (error) {
+      console.error("Failed to register achievement", error);
+      setSubmitError("登録に失敗しました。入力内容とデータベース接続を確認して、もう一度お試しください。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <form className="card stack" onSubmit={(event) => { event.preventDefault(); registerAchievement(achievementText, achievementYearMonth, readAiFeedback(event.currentTarget)); setAchievementText(""); }}>
+    <form className="card stack" onSubmit={(event) => void submit(event)}>
       <label>年月<input type="month" value={achievementYearMonth} onChange={(event) => setAchievementYearMonth(event.target.value)} /></label>
       <textarea className="large-entry" value={achievementText} onChange={(event) => setAchievementText(event.target.value)} placeholder="達成した実績を入力" />
-      <AiFeedbackPreview kind="achievement" pointUnit="AP" title={achievementText} content={achievementText} extraContext={{ yearMonth: achievementYearMonth }} />
-      <button className="primary" type="submit">この内容で登録</button>
+      <AiFeedbackPreview kind="achievement" pointUnit="AP" title={achievementText} content={achievementText} extraContext={{ yearMonth: achievementYearMonth }} onValidityChange={setHasCurrentEvaluation} />
+      {submitError && <p className="feedback-error" role="alert">{submitError}</p>}
+      <button className="primary" type="submit" disabled={!hasCurrentEvaluation || isSubmitting || !achievementText.trim()}>{isSubmitting ? "登録中…" : "この内容で登録"}</button>
     </form>
   );
 }
 
-function AiFeedbackPreview({ kind, pointUnit, title, content, extraContext }: { kind: "knowledge" | "skill" | "achievement"; pointUnit: "KP" | "SP" | "AP"; title: string; content: string; extraContext?: Record<string, unknown> }) {
+function AiFeedbackPreview({ kind, pointUnit, title, content, extraContext, onValidityChange }: { kind: "knowledge" | "skill" | "achievement"; pointUnit: "KP" | "SP" | "AP"; title: string; content: string; extraContext?: Record<string, unknown>; onValidityChange?: (isValid: boolean) => void }) {
   const [feedback, setFeedback] = useState<AiFeedback | null>(null);
   const [evaluatedContent, setEvaluatedContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const currentContent = JSON.stringify({ title: title.trim(), content: content.trim(), extraContext });
   const isStale = Boolean(feedback && evaluatedContent !== currentContent);
+
+  useEffect(() => {
+    onValidityChange?.(Boolean(feedback && !isStale));
+  }, [feedback, isStale, onValidityChange]);
 
   const evaluate = async () => {
     if (!title.trim() && !content.trim()) return;
@@ -888,7 +963,7 @@ function AiFeedbackPreview({ kind, pointUnit, title, content, extraContext }: { 
       {feedback && <div className={`ai-feedback-result ${isStale ? "stale" : ""}`}>
         <span className="feedback-points">{feedback.points}{pointUnit}</span>
         <p>{feedback.reason}</p>
-        {isStale && <small>入力内容が変更されています。最新の内容で再評価してください。</small>}
+        {isStale && <small>入力内容が変更されています。最新の内容で再評価してください。再評価した内容と結果だけを登録します。</small>}
       </div>}
       {feedback && !isStale && <>
         <input type="hidden" name="aiPoints" value={feedback.points} />
@@ -1206,4 +1281,3 @@ function formatShortDate(value: string) {
   const date = new Date(value);
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
-
