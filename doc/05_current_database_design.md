@@ -42,13 +42,13 @@
 
 ## 5. knowledge_entries
 
-獲得ナレッジ画面の年月・本文・KP評価を保存する。フォームにないリスク・分類・対象などの項目は持たない。
+獲得ナレッジ画面で指定した年月・本文・KP評価を保存する。3種類のポイント記録は年月カラムを `recordedAt` に統一する。フォームにないリスク・分類・対象などの項目は持たない。
 
 | カラム | 型 | 制約・説明 |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | FK users, index |
-| `occurred_at` | timestamptz | フォームの年月、index |
+| `recordedAt` | timestamptz | フォームで指定した年月、index |
 | `content` | text | ナレッジ本文 |
 | `knowledge_points` | integer | KP |
 | `knowledge_point_reason` | text | AI判定理由 |
@@ -58,7 +58,7 @@
 
 主なインデックス:
 
-- `user_id, occurred_at desc`
+- `user_id, recordedAt desc`
 
 ## 6. acquired_skills
 
@@ -85,12 +85,12 @@
 | `risk_level` | enum | リスク目安、nullable |
 | `points` | integer | SP |
 | `reason` | text | AI判定理由 |
-| `acquired_at` | timestamptz | フォームの発生日時 |
+| `recordedAt` | timestamptz | フォームで指定した発生日時、index |
 | `created_at` | timestamptz | not null |
 
 主なインデックス:
 
-- `user_id, acquired_at desc`
+- `user_id, recordedAt desc`
 
 ## 7. achievement_records
 
@@ -103,16 +103,16 @@
 | `title` | text | 達成した実績 |
 | `points` | integer | AP |
 | `reason` | text | AI判定理由 |
-| `achieved_at` | timestamptz | 登録日時 |
+| `recordedAt` | timestamptz | フォームで指定した年月、index |
 | `created_at` | timestamptz | not null |
 
 主なインデックス:
 
-- `user_id, achieved_at desc`
+- `user_id, recordedAt desc`
 
 ## 8. monthly_reports
 
-レポート画面で作成した月次評価を保存する。
+レポート画面で指定した年月の月次評価を保存する。3種類の記録テーブルから、`recordedAt` が日本時間の対象月に含まれるデータを集計する。
 
 | カラム | 型 | 制約・説明 |
 |---|---|---|

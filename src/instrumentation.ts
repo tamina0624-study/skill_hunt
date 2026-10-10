@@ -14,6 +14,62 @@ export async function register() {
 
   console.info('REBUILD_DATABASE=1: applying non-destructive database repairs.');
 
+  await prisma.$executeRaw(Prisma.sql`DO $rename_recorded_at$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'knowledge_entries' AND column_name = 'occurredAt'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'knowledge_entries' AND column_name = 'recordedAt'
+      ) THEN
+        RAISE EXCEPTION 'Both knowledge_entries.occurredAt and knowledge_entries.recordedAt exist; resolve the duplicate date columns before repair.';
+      ELSIF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'knowledge_entries' AND column_name = 'occurredAt'
+      ) THEN
+        ALTER TABLE public.knowledge_entries RENAME COLUMN "occurredAt" TO "recordedAt";
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'acquired_skills' AND column_name = 'acquiredAt'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'acquired_skills' AND column_name = 'recordedAt'
+      ) THEN
+        RAISE EXCEPTION 'Both acquired_skills.acquiredAt and acquired_skills.recordedAt exist; resolve the duplicate date columns before repair.';
+      ELSIF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'acquired_skills' AND column_name = 'acquiredAt'
+      ) THEN
+        ALTER TABLE public.acquired_skills RENAME COLUMN "acquiredAt" TO "recordedAt";
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'achievement_records' AND column_name = 'achievedAt'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'achievement_records' AND column_name = 'recordedAt'
+      ) THEN
+        RAISE EXCEPTION 'Both achievement_records.achievedAt and achievement_records.recordedAt exist; resolve the duplicate date columns before repair.';
+      ELSIF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'achievement_records' AND column_name = 'achievedAt'
+      ) THEN
+        ALTER TABLE public.achievement_records RENAME COLUMN "achievedAt" TO "recordedAt";
+      END IF;
+    END
+  $rename_recorded_at$`);
+
+  await prisma.$executeRaw(Prisma.sql`ALTER TABLE public.knowledge_entries
+    ADD COLUMN IF NOT EXISTS "recordedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`);
+  await prisma.$executeRaw(Prisma.sql`ALTER TABLE public.acquired_skills
+    ADD COLUMN IF NOT EXISTS "recordedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`);
+  await prisma.$executeRaw(Prisma.sql`ALTER TABLE public.achievement_records
+    ADD COLUMN IF NOT EXISTS "recordedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`);
+
   await prisma.$executeRaw(Prisma.sql`DO $repair$
     BEGIN
       IF NOT EXISTS (
@@ -62,7 +118,6 @@ export async function register() {
     ADD COLUMN IF NOT EXISTS "riskLevel" public."RiskLevel",
     ADD COLUMN IF NOT EXISTS points INTEGER NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS reason TEXT NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS "acquiredAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`);
 
   const [legacySubject] = await prisma.$queryRaw<{ exists: boolean }[]>(

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { parseRecordDate } from '../../../lib/record-date';
 import { prisma } from '../../../lib/prisma';
 
 export const runtime = 'nodejs';
@@ -29,7 +30,7 @@ export async function GET() {
   const user = await getDemoUser();
   const skills = await prisma.acquiredSkill.findMany({
     where: { userId: user.id },
-    orderBy: { acquiredAt: 'desc' },
+    orderBy: { recordedAt: 'desc' },
   });
 
   return NextResponse.json(skills);
@@ -45,6 +46,11 @@ export async function POST(request: Request) {
   }
   if (payload.confidentialityConfirmed !== true) {
     return NextResponse.json({ error: 'confidentiality confirmation is required' }, { status: 400 });
+  }
+
+  const recordedAt = parseRecordDate(payload.recordedAt);
+  if (!recordedAt) {
+    return NextResponse.json({ error: 'recordedAt must be a valid date' }, { status: 400 });
   }
 
   const judgment = readAiEvaluation(payload);
@@ -94,7 +100,7 @@ export async function POST(request: Request) {
       riskLevel: riskLevel as 'low' | 'medium' | 'high' | 'critical' | null,
       points: judgment.points,
       reason: judgment.reason,
-      acquiredAt: new Date(payload.occurredAt ?? (payload.yearMonth ? `${payload.yearMonth}-01T00:00:00.000Z` : Date.now())),
+      recordedAt,
     },
   });
 

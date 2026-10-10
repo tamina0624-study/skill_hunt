@@ -29,7 +29,7 @@ type ListKind = "all" | "knowledge" | "skill" | "achievement";
 
 type KnowledgeEntry = {
   id: string;
-  occurredAt: string;
+  recordedAt: string;
   content: string;
   knowledgePoints: number;
   knowledgePointReason: string;
@@ -67,7 +67,7 @@ type AcquiredSkill = {
   riskLevel: RiskLevel;
   points: number;
   reason: string;
-  acquiredAt: string;
+  recordedAt: string;
 };
 
 type AchievementRecord = {
@@ -75,7 +75,7 @@ type AchievementRecord = {
   title: string;
   points: number;
   reason: string;
-  achievedAt: string;
+  recordedAt: string;
 };
 
 type ChatMessage = {
@@ -189,7 +189,10 @@ const nowLocalInput = () => {
   return now.toISOString().slice(0, 16);
 };
 
-const currentMonthInput = () => new Date().toISOString().slice(0, 7);
+const currentMonthInput = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
 
 const calculateRisk = (occurrence: number, severity: number, detectability: number) => {
   const rpn = occurrence * severity * detectability;
@@ -215,14 +218,14 @@ const maskSecrets = (value: string) =>
 const sampleNearMisses: KnowledgeEntry[] = [
   {
     id: "nm-1",
-    occurredAt: "2026-09-03T01:30",
+    recordedAt: "2026-09-03T01:30",
     content: "対象機器を取り違えて設定しそうになった。実行直前にIPアドレスを照合して気づいた。",
     knowledgePoints: 0,
     knowledgePointReason: "初期データのため未判定です。",
   },
   {
     id: "nm-2",
-    occurredAt: "2026-09-01T09:10",
+    recordedAt: "2026-09-01T09:10",
     content: "検証環境のファイルを本番用として添付しそうになった。ファイル名規則が似ていた。",
     knowledgePoints: 0,
     knowledgePointReason: "初期データのため未判定です。",
@@ -262,7 +265,7 @@ const blankForm = (): DraftForm => ({
 });
 
 const formFromNearMiss = (nearMiss: KnowledgeEntry): DraftForm => ({
-  occurredAt: nearMiss.occurredAt,
+  occurredAt: nearMiss.recordedAt,
   workContext: nearMiss.content.slice(0, 200),
   description: nearMiss.content,
   potentialImpact: "",
@@ -288,7 +291,7 @@ const refreshServerState = async (fallbackState: AppState = initialState): Promi
 
     nextState.nearMisses = (baseState.nearMisses as unknown as Array<Record<string, unknown>>).map((entry) => ({
       id: String(entry.id ?? crypto.randomUUID()),
-      occurredAt: String(entry.occurredAt ?? new Date().toISOString()),
+      recordedAt: String(entry.recordedAt ?? entry.occurredAt ?? new Date().toISOString()),
       content: String(entry.content ?? [entry.workContext, entry.description, entry.potentialImpact, entry.perceivedCause, entry.detectionTrigger, entry.userCountermeasure].filter(Boolean).join(" / ")),
       knowledgePoints: Number(entry.knowledgePoints ?? 0),
       knowledgePointReason: String(entry.knowledgePointReason ?? "以前のナレッジ記録から移行しました。"),
@@ -297,7 +300,7 @@ const refreshServerState = async (fallbackState: AppState = initialState): Promi
     if (knowledgeResponse.ok) {
       const knowledgeEntries = (await knowledgeResponse.json()) as Array<{
         id: string;
-        occurredAt: string;
+        recordedAt: string;
         content: string;
         knowledgePoints?: number;
         knowledgePointReason?: string;
@@ -305,7 +308,7 @@ const refreshServerState = async (fallbackState: AppState = initialState): Promi
 
       nextState.nearMisses = knowledgeEntries.map((entry) => ({
         id: entry.id,
-        occurredAt: entry.occurredAt,
+        recordedAt: entry.recordedAt,
         content: entry.content,
         knowledgePoints: entry.knowledgePoints ?? 0,
         knowledgePointReason: entry.knowledgePointReason ?? "DBから読み込んだナレッジです。",
@@ -332,7 +335,7 @@ const refreshServerState = async (fallbackState: AppState = initialState): Promi
         riskLevel?: RiskLevel | null;
         points: number;
         reason: string;
-        acquiredAt: string;
+        recordedAt: string;
       }>;
 
       nextState.acquiredSkills = skills.map((skill) => ({
@@ -354,7 +357,7 @@ const refreshServerState = async (fallbackState: AppState = initialState): Promi
         riskLevel: skill.riskLevel ?? "low",
         points: skill.points,
         reason: skill.reason,
-        acquiredAt: skill.acquiredAt,
+        recordedAt: skill.recordedAt,
       }));
     }
 
@@ -364,7 +367,7 @@ const refreshServerState = async (fallbackState: AppState = initialState): Promi
         title: string;
         points: number;
         reason: string;
-        achievedAt: string;
+        recordedAt: string;
       }>;
 
       nextState.achievementRecords = achievements.map((achievement) => ({
@@ -372,7 +375,7 @@ const refreshServerState = async (fallbackState: AppState = initialState): Promi
         title: achievement.title,
         points: achievement.points,
         reason: achievement.reason,
-        achievedAt: achievement.achievedAt,
+        recordedAt: achievement.recordedAt,
       }));
     }
 
@@ -418,13 +421,13 @@ export default function Home() {
   }, [appState, loaded]);
 
   const totalNearMisses = appState.nearMisses.length;
-  const monthlyNearMisses = appState.nearMisses.filter((nearMiss) => isInCurrentMonth(nearMiss.occurredAt)).length;
-  const monthlyKnowledgeGrowth = appState.nearMisses.filter((nearMiss) => isInCurrentMonth(nearMiss.occurredAt)).reduce((total, nearMiss) => total + (nearMiss.knowledgePoints ?? 0), 0);
-  const monthlySkillGrowth = (appState.acquiredSkills ?? []).filter((skill) => isInCurrentMonth(skill.acquiredAt)).reduce((total, skill) => total + skill.points, 0);
-  const monthlyAchievementGrowth = (appState.achievementRecords ?? []).filter((achievement) => isInCurrentMonth(achievement.achievedAt)).reduce((total, achievement) => total + achievement.points, 0);
+  const monthlyNearMisses = appState.nearMisses.filter((nearMiss) => isInCurrentMonth(nearMiss.recordedAt)).length;
+  const monthlyKnowledgeGrowth = appState.nearMisses.filter((nearMiss) => isInCurrentMonth(nearMiss.recordedAt)).reduce((total, nearMiss) => total + (nearMiss.knowledgePoints ?? 0), 0);
+  const monthlySkillGrowth = (appState.acquiredSkills ?? []).filter((skill) => isInCurrentMonth(skill.recordedAt)).reduce((total, skill) => total + skill.points, 0);
+  const monthlyAchievementGrowth = (appState.achievementRecords ?? []).filter((achievement) => isInCurrentMonth(achievement.recordedAt)).reduce((total, achievement) => total + achievement.points, 0);
   const monthlyEngineerGrowth = appState.quests.filter((quest) => quest.xpGranted && isInCurrentMonth(quest.dueAt)).reduce((total, quest) => total + quest.xp, 0) + monthlySkillGrowth + monthlyKnowledgeGrowth + monthlyAchievementGrowth;
   const currentLevel = levelFromXp(appState.totalXp);
-  const latestNearMiss = [...appState.nearMisses].sort((first, second) => new Date(second.occurredAt).getTime() - new Date(first.occurredAt).getTime())[0];
+  const latestNearMiss = [...appState.nearMisses].sort((first, second) => new Date(second.recordedAt).getTime() - new Date(first.recordedAt).getTime())[0];
   const savedReports = getSavedReports(appState);
   const latestReport = savedReports[0];
   const monthlyRegistrationFeedback = latestReport?.monthlyEvaluation ?? buildMonthlyRegistrationFeedback(appState.nearMisses);
@@ -514,8 +517,7 @@ export default function Home() {
         detectability: risk.detectability,
         rpn: risk.rpn,
         riskLevel: risk.riskLevel,
-        yearMonth: skillForm.occurredAt.slice(0, 7),
-        occurredAt: skillForm.occurredAt,
+        recordedAt: new Date(skillForm.occurredAt).toISOString(),
         aiEvaluation,
       }),
     });
@@ -533,7 +535,7 @@ export default function Home() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        occurredAt: `${yearMonth}-01T00:00:00.000Z`,
+        recordedAt: `${yearMonth}-01T00:00:00.000Z`,
         content: cleanTitle,
         aiEvaluation,
       }),
@@ -553,7 +555,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: cleanTitle,
-        yearMonth,
+        recordedAt: `${yearMonth}-01T00:00:00.000Z`,
         aiEvaluation,
       }),
     });
@@ -579,25 +581,15 @@ export default function Home() {
     setAppState(refreshed);
   };
 
-  const generateReport = async () => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
+  const generateReport = async (yearMonth: string) => {
     const response = await fetch("/api/reports", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ yearMonth: currentMonth }),
+      body: JSON.stringify({ yearMonth }),
     });
 
     if (!response.ok) {
-      const fallback = buildAiReport(appState.nearMisses, appState.acquiredSkills ?? [], appState.achievementRecords ?? [], appState.totalXp, monthlyEngineerGrowth, latestNearMiss);
-      setAppState((current) => {
-        const currentReports = getSavedReports(current);
-        return {
-          ...current,
-          reports: [fallback, ...currentReports.filter((savedReport) => savedReport.periodKey !== fallback.periodKey)],
-          latestReport: fallback,
-        };
-      });
-      return;
+      throw new Error(`Report generation failed with status ${response.status}.`);
     }
 
     const report = (await response.json()) as AiReport;
@@ -963,7 +955,6 @@ function AiFeedbackPreview({ kind, pointUnit, title, content, extraContext, onVa
       {feedback && <div className={`ai-feedback-result ${isStale ? "stale" : ""}`}>
         <span className="feedback-points">{feedback.points}{pointUnit}</span>
         <p>{feedback.reason}</p>
-        {isStale && <small>入力内容が変更されています。最新の内容で再評価してください。再評価した内容と結果だけを登録します。</small>}
       </div>}
       {feedback && !isStale && <>
         <input type="hidden" name="aiPoints" value={feedback.points} />
@@ -975,32 +966,34 @@ function AiFeedbackPreview({ kind, pointUnit, title, content, extraContext, onVa
   );
 }
 
-function ReportView({ reports, generateReport }: { reports: AiReport[]; generateReport: () => void }) {
-  const reportYears = Array.from(new Set(reports.map((report) => report.periodKey.slice(0, 4))));
-  const [selectedYear, setSelectedYear] = useState(reportYears[0] ?? String(new Date().getFullYear()));
-  const [selectedMonth, setSelectedMonth] = useState(reports[0]?.periodKey.slice(5, 7) ?? String(new Date().getMonth() + 1).padStart(2, "0"));
-  const [displayedPeriodKey, setDisplayedPeriodKey] = useState(reports[0]?.periodKey ?? "");
-  const displayedReport = reports.find((report) => report.periodKey === displayedPeriodKey);
-  const monthOptions = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"));
+function ReportView({ reports, generateReport }: { reports: AiReport[]; generateReport: (yearMonth: string) => Promise<void> }) {
+  const [selectedPeriod, setSelectedPeriod] = useState(reports[0]?.periodKey ?? currentMonthInput());
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState("");
+  const displayedReport = reports.find((report) => report.periodKey === selectedPeriod);
 
-  useEffect(() => {
-    if (!reports.length) return;
-    const displayedExists = reports.some((report) => report.periodKey === displayedPeriodKey);
-    if (!reportYears.includes(selectedYear)) setSelectedYear(reports[0].periodKey.slice(0, 4));
-    if (!monthOptions.includes(selectedMonth)) setSelectedMonth(reports[0].periodKey.slice(5, 7));
-    if (!displayedExists) setDisplayedPeriodKey(reports[0].periodKey);
-  }, [displayedPeriodKey, monthOptions, reportYears, reports, selectedMonth, selectedYear]);
+  const createReport = async () => {
+    setIsGenerating(true);
+    setError("");
+    try {
+      await generateReport(selectedPeriod);
+    } catch (cause) {
+      console.error("Failed to generate monthly report", cause);
+      setError("レポートを作成できませんでした。時間をおいて再度お試しください。");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <section className="card stack">
-      <div className="card-head"><div><h2>月次レポート</h2><p className="subtle">選択した月のナレッジ・スキル・実績をもとに評価を作成します。</p></div><button className="primary" onClick={generateReport}><Sparkles size={16} />月次レポートを作成</button></div>
-      {reports.length ? <>
-        <div className="report-item report-picker"><label>年<select value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)}>{reportYears.map((year) => <option key={year} value={year}>{year}年</option>)}</select></label><label>月<select value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}>{monthOptions.map((month) => <option key={month} value={month}>{Number(month)}月</option>)}</select></label><button className="primary" type="button" onClick={() => setDisplayedPeriodKey(`${selectedYear}-${selectedMonth}`)}>表示</button></div>
-        {displayedReport ? <>
-          <div className="report-item"><strong>月次評価</strong><p>{displayedReport.monthlyEvaluation.title}</p><p className="subtle">{displayedReport.monthlyEvaluation.message}</p><p className="small">{displayedReport.monthlyEvaluation.focus}</p></div>
-          <div className="report-item"><strong>エンジニア力評価</strong><p>{displayedReport.engineerEvaluation.title}</p><p className="subtle">{displayedReport.engineerEvaluation.message}</p><p className="small">{displayedReport.engineerEvaluation.nextAction}</p></div>
-        </> : <div className="empty slim">選択した年月のレポートは保存されていません。</div>}
-      </> : <div className="empty">まだ月次レポートは作成されていません。月次レポートを作成すると、評価コメントを確認できます。</div>}
+      <div className="card-head"><div><h2>月次レポート</h2><p className="subtle">選択した年月のナレッジ・スキル・実績を集計します。</p></div><button className="primary" type="button" disabled={isGenerating} onClick={() => void createReport()}><Sparkles size={16} />{isGenerating ? "作成中…" : "月次レポートを作成"}</button></div>
+      <div className="report-item report-picker"><label>対象年月<input type="month" value={selectedPeriod} onChange={(event) => setSelectedPeriod(event.target.value)} required /></label></div>
+      {error && <p className="feedback-error" role="alert">{error}</p>}
+      {displayedReport ? <>
+        <div className="report-item"><strong>月次評価</strong><p>{displayedReport.monthlyEvaluation.title}</p><p className="subtle">{displayedReport.monthlyEvaluation.message}</p><p className="small">{displayedReport.monthlyEvaluation.focus}</p></div>
+        <div className="report-item"><strong>エンジニア力評価</strong><p>{displayedReport.engineerEvaluation.title}</p><p className="subtle">{displayedReport.engineerEvaluation.message}</p><p className="small">{displayedReport.engineerEvaluation.nextAction}</p></div>
+      </> : <div className="empty slim">選択した年月のレポートは保存されていません。</div>}
     </section>
   );
 }
@@ -1057,13 +1050,13 @@ function buildSearchListItems(appState: AppState, searchText: string, kindFilter
   const items: SearchListItem[] = [];
 
   if (kindFilter === "all" || kindFilter === "knowledge") {
-    items.push(...appState.nearMisses.filter((entry) => statusFilter === "all" && matches([entry.content, entry.knowledgePointReason, entry.occurredAt, entry.knowledgePoints])).map((entry) => ({
+    items.push(...appState.nearMisses.filter((entry) => statusFilter === "all" && matches([entry.content, entry.knowledgePointReason, entry.recordedAt, entry.knowledgePoints])).map((entry) => ({
       id: `knowledge-${entry.id}`,
       recordId: entry.id,
       kind: "knowledge" as const,
       title: entry.content,
       summary: entry.knowledgePointReason,
-      meta: formatShortDate(entry.occurredAt),
+      meta: formatShortDate(entry.recordedAt),
       knowledgePoints: entry.knowledgePoints,
       skillPoints: calculateRelatedSkillPoints(entry.id, appState.quests),
       nearMissId: entry.id,
@@ -1071,25 +1064,25 @@ function buildSearchListItems(appState: AppState, searchText: string, kindFilter
   }
 
   if (statusFilter === "all" && (kindFilter === "all" || kindFilter === "skill")) {
-    items.push(...(appState.acquiredSkills ?? []).filter((skill) => matches([skill.title, skill.description, skill.potentialImpact, skill.perceivedCause, skill.detectionTrigger, skill.userCountermeasure, skill.reason, skill.acquiredAt, skill.points])).map((skill) => ({
+    items.push(...(appState.acquiredSkills ?? []).filter((skill) => matches([skill.title, skill.description, skill.potentialImpact, skill.perceivedCause, skill.detectionTrigger, skill.userCountermeasure, skill.reason, skill.recordedAt, skill.points])).map((skill) => ({
       id: `skill-${skill.id}`,
       recordId: skill.id,
       kind: "skill" as const,
       title: skill.title,
       summary: skill.description || skill.reason,
-      meta: formatShortDate(skill.acquiredAt),
+      meta: formatShortDate(skill.recordedAt),
       skillPoints: skill.points,
     })));
   }
 
   if (statusFilter === "all" && (kindFilter === "all" || kindFilter === "achievement")) {
-    items.push(...(appState.achievementRecords ?? []).filter((achievement) => matches([achievement.title, achievement.reason, achievement.achievedAt, achievement.points])).map((achievement) => ({
+    items.push(...(appState.achievementRecords ?? []).filter((achievement) => matches([achievement.title, achievement.reason, achievement.recordedAt, achievement.points])).map((achievement) => ({
       id: `achievement-${achievement.id}`,
       recordId: achievement.id,
       kind: "achievement" as const,
       title: achievement.title,
       summary: achievement.reason,
-      meta: formatShortDate(achievement.achievedAt),
+      meta: formatShortDate(achievement.recordedAt),
       achievementPoints: achievement.points,
     })));
   }
@@ -1129,9 +1122,9 @@ function isInCurrentMonth(value: string) {
 }
 
 function buildMonthlyRegistrationFeedback(nearMisses: KnowledgeEntry[], acquiredSkills: AcquiredSkill[] = [], achievementRecords: AchievementRecord[] = []) {
-  const monthlyItems = nearMisses.filter((nearMiss) => isInCurrentMonth(nearMiss.occurredAt));
-  const monthlySkills = acquiredSkills.filter((skill) => isInCurrentMonth(skill.acquiredAt));
-  const monthlyAchievements = achievementRecords.filter((achievement) => isInCurrentMonth(achievement.achievedAt));
+  const monthlyItems = nearMisses.filter((nearMiss) => isInCurrentMonth(nearMiss.recordedAt));
+  const monthlySkills = acquiredSkills.filter((skill) => isInCurrentMonth(skill.recordedAt));
+  const monthlyAchievements = achievementRecords.filter((achievement) => isInCurrentMonth(achievement.recordedAt));
   const knowledgePoints = monthlyItems.reduce((total, nearMiss) => total + (nearMiss.knowledgePoints ?? 0), 0);
   const skillPoints = monthlySkills.reduce((total, skill) => total + skill.points, 0);
   const achievementPoints = monthlyAchievements.reduce((total, achievement) => total + achievement.points, 0);
@@ -1147,19 +1140,6 @@ function buildMonthlyRegistrationFeedback(nearMisses: KnowledgeEntry[], acquired
     title: `今月も前に進めています`,
     message: `ナレッジ${monthlyItems.length}件、スキル${monthlySkills.length}件、実績${monthlyAchievements.length}件を登録できています。内訳は${knowledgePoints}KP、${skillPoints}SP、${achievementPoints}APです。日々の学びを記録できていて、成長の土台が積み上がっています。`,
     focus: buildMonthlyFocus(monthlyItems, monthlySkills, monthlyAchievements),
-  };
-}
-
-function buildAiReport(nearMisses: KnowledgeEntry[], acquiredSkills: AcquiredSkill[], achievementRecords: AchievementRecord[], totalEngineerPower: number, monthlyGrowth: number, latestNearMiss?: KnowledgeEntry): AiReport {
-  const now = new Date();
-  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  return {
-    id: `report-${Date.now()}`,
-    periodKey,
-    generatedAt: now.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }),
-    periodLabel: `${now.getFullYear()}年${now.getMonth() + 1}月`,
-    monthlyEvaluation: buildMonthlyRegistrationFeedback(nearMisses, acquiredSkills, achievementRecords),
-    engineerEvaluation: buildEngineerAssessment(totalEngineerPower, monthlyGrowth, latestNearMiss, acquiredSkills, achievementRecords),
   };
 }
 
@@ -1213,8 +1193,8 @@ function buildMonthlyFocus(monthlyItems: KnowledgeEntry[], monthlySkills: Acquir
 function buildEngineerAssessment(totalEngineerPower: number, monthlyGrowth: number, latestNearMiss?: KnowledgeEntry, acquiredSkills: AcquiredSkill[] = [], achievementRecords: AchievementRecord[] = []) {
   const level = levelFromXp(totalEngineerPower);
   const knowledgeFocus = latestNearMiss?.content.trim() ? `「${latestNearMiss.content.slice(0, 32)}」` : "日々の気づき";
-  const monthlySkills = acquiredSkills.filter((skill) => isInCurrentMonth(skill.acquiredAt));
-  const monthlyAchievements = achievementRecords.filter((achievement) => isInCurrentMonth(achievement.achievedAt));
+  const monthlySkills = acquiredSkills.filter((skill) => isInCurrentMonth(skill.recordedAt));
+  const monthlyAchievements = achievementRecords.filter((achievement) => isInCurrentMonth(achievement.recordedAt));
   if (monthlyGrowth >= 50) {
     return {
       title: `Lv ${level} 大きく前進しています`,
@@ -1237,13 +1217,13 @@ function buildEngineerAssessment(totalEngineerPower: number, monthlyGrowth: numb
 }
 
 function buildRegistrationTrend(nearMisses: KnowledgeEntry[]): TrendPoint[] {
-  const sorted = [...nearMisses].sort((first, second) => new Date(first.occurredAt).getTime() - new Date(second.occurredAt).getTime());
+  const sorted = [...nearMisses].sort((first, second) => new Date(first.recordedAt).getTime() - new Date(second.recordedAt).getTime());
   let runningTotal = 0;
   const points: TrendPoint[] = [{ label: "開始", value: 0 }];
 
   sorted.forEach((nearMiss) => {
     runningTotal += 1;
-    points.push({ label: formatShortDate(nearMiss.occurredAt), value: runningTotal });
+    points.push({ label: formatShortDate(nearMiss.recordedAt), value: runningTotal });
   });
 
   if (points.length === 1) {
@@ -1256,9 +1236,9 @@ function buildRegistrationTrend(nearMisses: KnowledgeEntry[]): TrendPoint[] {
 function buildEngineerTrend(quests: Quest[], acquiredSkills: AcquiredSkill[], nearMisses: KnowledgeEntry[], achievementRecords: AchievementRecord[], totalEngineerPower: number): TrendPoint[] {
   const events = [
     ...quests.filter((quest) => quest.xpGranted).map((quest) => ({ date: quest.dueAt, points: quest.xp })),
-    ...acquiredSkills.map((skill) => ({ date: skill.acquiredAt, points: skill.points })),
-    ...nearMisses.filter((nearMiss) => (nearMiss.knowledgePoints ?? 0) > 0).map((nearMiss) => ({ date: nearMiss.occurredAt, points: nearMiss.knowledgePoints ?? 0 })),
-    ...achievementRecords.map((achievement) => ({ date: achievement.achievedAt, points: achievement.points })),
+    ...acquiredSkills.map((skill) => ({ date: skill.recordedAt, points: skill.points })),
+    ...nearMisses.filter((nearMiss) => (nearMiss.knowledgePoints ?? 0) > 0).map((nearMiss) => ({ date: nearMiss.recordedAt, points: nearMiss.knowledgePoints ?? 0 })),
+    ...achievementRecords.map((achievement) => ({ date: achievement.recordedAt, points: achievement.points })),
   ].sort((first, second) => new Date(first.date).getTime() - new Date(second.date).getTime());
   const completedPoints = events.reduce((total, event) => total + event.points, 0);
   let runningTotal = Math.max(0, totalEngineerPower - completedPoints);

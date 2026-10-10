@@ -15,33 +15,37 @@ async function getDemoUser() {
   });
 }
 
+function isValidYearMonth(yearMonth: string) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(yearMonth);
+}
+
 function monthBounds(yearMonth: string) {
   const [year, month] = yearMonth.split('-').map(Number);
-  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-  const end = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+  const start = new Date(Date.UTC(year, month - 1, 1) - 9 * 60 * 60 * 1000);
+  const end = new Date(Date.UTC(year, month, 1) - 9 * 60 * 60 * 1000);
   return { start, end };
 }
 
-function buildMonthlyEvaluation(knowledgeCount: number, skillCount: number, achievementCount: number, knowledgePoints: number, skillPoints: number, achievementPoints: number) {
+function buildMonthlyEvaluation(periodLabel: string, knowledgeCount: number, skillCount: number, achievementCount: number, knowledgePoints: number, skillPoints: number, achievementPoints: number) {
   if (knowledgeCount === 0 && skillCount === 0 && achievementCount === 0) {
     return {
       title: '次の一歩を始める準備ができています',
-      message: '今月の登録はまだありませんが、1件の記録から成長の軌跡を始められます。',
+      message: `${periodLabel}の登録はまだありませんが、1件の記録から成長の軌跡を始められます。`,
       focus: '次のステップ: まずは最も大事な一件だけを、対象・気づき・対策の3点で残しましょう。',
     };
   }
 
   return {
-    title: '今月も前に進めています',
-    message: `ナレッジ${knowledgeCount}件、スキル${skillCount}件、実績${achievementCount}件を記録できています。内訳は${knowledgePoints}KP、${skillPoints}SP、${achievementPoints}APです。`,
+    title: `${periodLabel}も前に進めています`,
+    message: `${periodLabel}の記録はナレッジ${knowledgeCount}件、スキル${skillCount}件、実績${achievementCount}件です。内訳は${knowledgePoints}KP、${skillPoints}SP、${achievementPoints}APです。`,
     focus: '次のステップ: いちばん強く再利用できる経験を選び、他の人にも伝えられる形にまとめましょう。',
   };
 }
 
-function buildEngineerEvaluation(totalEp: number, monthlyGrowth: number) {
+function buildEngineerEvaluation(periodLabel: string, totalEp: number, monthlyGrowth: number) {
   return {
     title: '成長の質が安定しています',
-    message: `現在の総EPは${totalEp}、今月の伸びは${monthlyGrowth}です。継続的に小さな改善を積み上げているため、今の成長は十分に支えられています。`,
+    message: `現在の総EPは${totalEp}、${periodLabel}の伸びは${monthlyGrowth}です。継続的に小さな改善を積み上げているため、今の成長は十分に支えられています。`,
     nextAction: '次は「再発防止」「標準化」「共有」を1つずつ明文化して、知識を次の作業へつなげてください。',
   };
 }
@@ -49,6 +53,10 @@ function buildEngineerEvaluation(totalEp: number, monthlyGrowth: number) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const yearMonth = searchParams.get('yearMonth') ?? '';
+  if (yearMonth && !isValidYearMonth(yearMonth)) {
+    return NextResponse.json({ error: 'yearMonth must use YYYY-MM format' }, { status: 400 });
+  }
+
   const user = await getDemoUser();
 
   if (!yearMonth) {
@@ -75,25 +83,26 @@ export async function POST(request: Request) {
   const payload = (await request.json()) as { yearMonth?: string };
   const yearMonth = String(payload.yearMonth ?? '').trim();
 
-  if (!yearMonth) {
+  if (!isValidYearMonth(yearMonth)) {
     return NextResponse.json({ error: 'yearMonth is required' }, { status: 400 });
   }
 
   const user = await getDemoUser();
   const { start, end } = monthBounds(yearMonth);
+  const periodLabel = `${yearMonth.slice(0, 4)}年${Number(yearMonth.slice(5, 7))}月`;
 
   const [knowledgeEntries, skills, achievements, userRecord] = await Promise.all([
     prisma.knowledgeEntry.findMany({
-      where: { userId: user.id, occurredAt: { gte: start, lt: end } },
-      orderBy: { occurredAt: 'desc' },
+      where: { userId: user.id, recordedAt: { gte: start, lt: end } },
+      orderBy: { recordedAt: 'desc' },
     }),
     prisma.acquiredSkill.findMany({
-      where: { userId: user.id, acquiredAt: { gte: start, lt: end } },
-      orderBy: { acquiredAt: 'desc' },
+      where: { userId: user.id, recordedAt: { gte: start, lt: end } },
+      orderBy: { recordedAt: 'desc' },
     }),
     prisma.achievementRecord.findMany({
-      where: { userId: user.id, achievedAt: { gte: start, lt: end } },
-      orderBy: { achievedAt: 'desc' },
+      where: { userId: user.id, recordedAt: { gte: start, lt: end } },
+      orderBy: { recordedAt: 'desc' },
     }),
     prisma.user.findUnique({ where: { id: user.id } }),
   ]);
@@ -107,8 +116,8 @@ export async function POST(request: Request) {
   const monthlyGrowth = knowledgePoints + skillPoints + achievementPoints;
   const totalEp = userRecord?.totalEp ?? 0;
 
-  const monthlyEvaluation = buildMonthlyEvaluation(knowledgeCount, skillCount, achievementCount, knowledgePoints, skillPoints, achievementPoints);
-  const engineerEvaluation = buildEngineerEvaluation(totalEp, monthlyGrowth);
+  const monthlyEvaluation = buildMonthlyEvaluation(periodLabel, knowledgeCount, skillCount, achievementCount, knowledgePoints, skillPoints, achievementPoints);
+  const engineerEvaluation = buildEngineerEvaluation(periodLabel, totalEp, monthlyGrowth);
 
   const report = await prisma.monthlyReport.upsert({
     where: {

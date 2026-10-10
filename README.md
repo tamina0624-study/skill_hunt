@@ -91,12 +91,14 @@ erDiagram
   KNOWLEDGE_ENTRIES {
     uuid id PK
     uuid userId FK
+    datetime recordedAt
     text content
     int knowledgePoints
   }
   ACQUIRED_SKILLS {
     uuid id PK
     uuid userId FK
+    datetime recordedAt
     string title
     text description
     int points
@@ -104,6 +106,7 @@ erDiagram
   ACHIEVEMENT_RECORDS {
     uuid id PK
     uuid userId FK
+    datetime recordedAt
     string title
     int points
   }
@@ -128,13 +131,15 @@ erDiagram
 | テーブル（Prismaモデル） | 主なフィールド | 制約・用途 |
 |---|---|---|
 | `users` (`User`) | `id`, `email`, `displayName`, `timezone`, `monthlyReportDay`, `monthlyReportTime`, `totalEp`, `createdAt`, `updatedAt` | `email` は一意。利用者情報と累計EP。 |
-| `knowledge_entries` (`KnowledgeEntry`) | `id`, `userId`, `occurredAt`, `content`, `knowledgePoints`, `knowledgePointReason`, `createdAt`, `updatedAt`, `deletedAt` | フォームの年月・本文、KPと判定理由。利用者・発生日にindex。 |
-| `acquired_skills` (`AcquiredSkill`) | `id`, `userId`, `title`, `description`, `confidentialityConfirmed`, `potentialImpact`, `perceivedCause`, `detectionTrigger`, `reuseIdea`, `impactLevel`, `status`, `categories`, `occurrenceScore`, `severityScore`, `detectabilityScore`, `rpn`, `riskLevel`, `points`, `reason`, `acquiredAt` | スキル登録フォームの各項目、SPと判定理由。利用者・取得日にindex。 |
-| `achievement_records` (`AchievementRecord`) | `id`, `userId`, `title`, `points`, `reason`, `achievedAt`, `createdAt` | 実績、APと判定理由。利用者・達成日にindex。 |
+| `knowledge_entries` (`KnowledgeEntry`) | `id`, `userId`, `recordedAt`, `content`, `knowledgePoints`, `knowledgePointReason`, `createdAt`, `updatedAt`, `deletedAt` | フォームの年月・本文、KPと判定理由。利用者・記録日にindex。 |
+| `acquired_skills` (`AcquiredSkill`) | `id`, `userId`, `title`, `description`, `confidentialityConfirmed`, `potentialImpact`, `perceivedCause`, `detectionTrigger`, `reuseIdea`, `impactLevel`, `status`, `categories`, `occurrenceScore`, `severityScore`, `detectabilityScore`, `rpn`, `riskLevel`, `points`, `reason`, `recordedAt` | スキル登録フォームの各項目、SPと判定理由。利用者・記録日にindex。 |
+| `achievement_records` (`AchievementRecord`) | `id`, `userId`, `title`, `points`, `reason`, `recordedAt`, `createdAt` | 実績、APと判定理由。利用者・記録日にindex。 |
 | `monthly_reports` (`MonthlyReport`) | `id`, `userId`, `periodKey`, `periodStart`, `periodEnd`, `generatedAt`, `monthlyTitle`, `monthlyMessage`, `monthlyFocus`, `engineerTitle`, `engineerMessage`, `engineerNextAction`, `snapshotJson` | 月次評価と集計スナップショット。`userId` と `periodKey` の組み合わせは一意。 |
 | `point_events` (`PointEvent`) | `id`, `userId`, `pointType`, `sourceType`, `knowledgeEntryId`, `acquiredSkillId`, `achievementRecordId`, `points`, `reason`, `idempotencyKey`, `createdAt` | ポイント加算履歴と参照元。`idempotencyKey` は一意で二重加算を防止。 |
 
 主なenumは `ImpactLevel`（`none` / `minor` / `occurred`）、`KnowledgeStatus`（`considering` / `completed`）、`RiskLevel`（`low` / `medium` / `high` / `critical`）、`PointType`（`KP` / `SP` / `AP`）、`PointSourceType`（`knowledge` / `skill` / `achievement` / `quest`）です。
+
+ナレッジ・スキル・実績の記録年月は、DB上の共通カラム `recordedAt` に保存します。月次レポートでは画面で選択した年月を対象にし、日本時間の月初から翌月月初までに記録されたデータを集計します。
 
 既存DBでは `knowledge_entries` の旧リスク・分類・対象列が削除されます。DB同期前に必要な旧データを退避し、バックアップを取得してください。
 
@@ -377,7 +382,7 @@ npm run db:repair
 npx prisma db push
 ```
 
-既存データを保持したまま、旧DB構造との不整合（`acquired_skills` の現行スキーマに必要な列・enum型の追加と、旧 `knowledge_entries.subject` / `summary` 列へのデフォルト値設定）を修復する場合は、`DATABASE_URL` が対象DBを指していることを確認してから次を実行します。このSQLは再実行可能で、既存レコードを削除しません。
+既存データを保持したまま、旧DB構造との不整合（3種類の記録日カラムを `recordedAt` に統一する列名変更、`acquired_skills` の現行スキーマに必要な列・enum型の追加、旧 `knowledge_entries.subject` / `summary` 列へのデフォルト値設定）を修復する場合は、`DATABASE_URL` が対象DBを指していることを確認してから次を実行します。このSQLは再実行可能で、既存レコードを削除しません。
 
 ```bash
 npm run db:repair

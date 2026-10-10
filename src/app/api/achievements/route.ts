@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { parseRecordDate } from '../../../lib/record-date';
 import { prisma } from '../../../lib/prisma';
 
 export const runtime = 'nodejs';
@@ -29,7 +30,7 @@ export async function GET() {
   const user = await getDemoUser();
   const items = await prisma.achievementRecord.findMany({
     where: { userId: user.id },
-    orderBy: { achievedAt: 'desc' },
+    orderBy: { recordedAt: 'desc' },
   });
 
   return NextResponse.json(items);
@@ -41,6 +42,11 @@ export async function POST(request: Request) {
 
   if (!title) {
     return NextResponse.json({ error: 'title is required' }, { status: 400 });
+  }
+
+  const recordedAt = parseRecordDate(payload.recordedAt);
+  if (!recordedAt) {
+    return NextResponse.json({ error: 'recordedAt must be a valid date' }, { status: 400 });
   }
 
   const judgment = readAiEvaluation(payload);
@@ -56,7 +62,7 @@ export async function POST(request: Request) {
       title,
       points: judgment.points,
       reason: judgment.reason,
-      achievedAt: new Date(payload.yearMonth ? `${payload.yearMonth}-01T00:00:00.000Z` : Date.now()),
+      recordedAt,
     },
   });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { parseRecordDate } from '../../../lib/record-date';
 import { prisma } from '../../../lib/prisma';
 
 export const runtime = 'nodejs';
@@ -63,6 +64,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'content is required' }, { status: 400 });
   }
 
+  const recordedAt = parseRecordDate(payload.recordedAt);
+  if (!recordedAt) {
+    return NextResponse.json({ error: 'recordedAt must be a valid date' }, { status: 400 });
+  }
+
   const judgment = readAiEvaluation(payload);
   if (!judgment) {
     return NextResponse.json({ error: 'A current AI evaluation is required' }, { status: 400 });
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
   const entry = await prisma.knowledgeEntry.create({
     data: {
       userId: user.id,
-      occurredAt: new Date(payload.occurredAt ?? Date.now()),
+      recordedAt,
       content,
       knowledgePoints: judgment.points,
       knowledgePointReason: judgment.reason,
