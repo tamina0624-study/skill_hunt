@@ -1,6 +1,9 @@
 ALTER TABLE public.acquired_skills
 ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
 
+ALTER TABLE public.acquired_skills
+ADD COLUMN IF NOT EXISTS "confidentialityConfirmed" BOOLEAN NOT NULL DEFAULT FALSE;
+
 DO $repair$
 BEGIN
   IF EXISTS (

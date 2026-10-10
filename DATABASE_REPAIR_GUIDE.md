@@ -88,7 +88,7 @@ export async function register() {
 - Preserves all existing data
 
 **Repairs applied**:
-- Adds missing columns (e.g., `description` on `acquired_skills`)
+- Adds missing `description` and `confidentialityConfirmed` columns on `acquired_skills`
 - Sets defaults for legacy `knowledge_entries.subject` and `knowledge_entries.summary` fields
 - Never drops columns or modifies existing data
 

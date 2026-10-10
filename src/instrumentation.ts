@@ -19,6 +19,11 @@ export async function register() {
       ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`,
   );
 
+  await prisma.$executeRaw(
+    Prisma.sql`ALTER TABLE public.acquired_skills
+      ADD COLUMN IF NOT EXISTS "confidentialityConfirmed" BOOLEAN NOT NULL DEFAULT FALSE`,
+  );
+
   const [legacySubject] = await prisma.$queryRaw<{ exists: boolean }[]>(
     Prisma.sql`SELECT EXISTS (
       SELECT 1
