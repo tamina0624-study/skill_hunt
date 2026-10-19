@@ -1,8 +1,8 @@
-# Safety Quest 要件定義書
+# skill hant 要件定義書
 
 ## 1. アプリケーション名
 
-Safety Quest
+skill hant
 
 ## 2. 目的
 

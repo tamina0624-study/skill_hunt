@@ -1,4 +1,4 @@
-# Safety Quest 基本設計書
+# skill hant 基本設計書
 
 ## 1. 設計方針
 
@@ -15,6 +15,7 @@
 | ORM | Prisma schema定義済み | Prisma Client |
 | AI | 疑似AIルール | AI Adapter経由の実API |
 | 認証 | デモログイン | Auth.js等 |
+| コミット前検査 | GitSecurityTool submodule + pre-commit | 検知ルールの運用に応じて調整 |
 
 ```mermaid
 flowchart TD
@@ -48,18 +49,21 @@ safety-quest/
 
 `node_modules` と `.next` は依存物・生成物であり、`src` 配下には置かない。
 
+GitSecurityToolはアプリケーションの実行時機能ではなく、開発時のコミット前検査としてルートの `.pre-commit-config.yaml` から実行する。ソースはGit submoduleで参照し、サブモジュールを含めたチェックアウトが必要。
+
 ## 4. モジュール構成
 
 | モジュール | 責務 | 現行実装 |
 |---|---|---|
 | Auth | デモログイン | `02.src/app/page.tsx` |
 | Dashboard | 件数、EP、推移、評価コメント表示 | `DashboardView` |
-| Knowledge | ナレッジ登録、KP判定 | `CreateView`, `judgeKnowledgePoints` |
+| Knowledge | 獲得ナレッジ登録、KP評価 | `QuestView`, `AiFeedbackPreview`, `registerKnowledge`, `/api/knowledge` |
 | AI Memo | 入力中ナレッジの整理メモ | `sendDraftMessage`, `buildDraftCoachReply` |
-| Skill | 獲得スキル登録、SP判定 | `QuestView`, `judgeSkillPoints` |
-| Achievement | 実績登録、AP判定 | `AchievementView`, `judgeAchievementPoints` |
+| Skill | スキル登録、SP評価、フォーム詳細保存 | `CreateView`, `AiFeedbackPreview`, `registerSkill`, `/api/skills` |
+| Achievement | 実績登録、AP評価 | `AchievementView`, `AiFeedbackPreview`, `/api/ai`, `/api/achievements` |
 | List | 種別横断検索 | `ListView`, `buildSearchListItems` |
 | Report | 月次レポート作成・保存・表示 | `ReportView`, `buildAiReport` |
+| Git Security | コミット前の機密情報・基本ファイル検査 | `.pre-commit-config.yaml`, `GitSecurityTool` submodule |
 | Settings | タイムゾーン、月次通知表示、初期化 | `SettingsView` |
 | DB Schema | PostgreSQL移行用DB定義 | `02.src/prisma/schema.prisma` |
 

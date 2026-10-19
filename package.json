@@ -1,14 +1,17 @@
 {
-  "name": "safety-quest",
+  "name": "skill-hant",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev 02.src",
-    "build": "next build 02.src",
+    "build": "npm run db:generate && next build 02.src",
     "start": "next start 02.src",
     "lint": "eslint 02.src",
     "db:validate": "prisma validate",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "db:repair": "prisma db execute --schema=./02.src/prisma/schema.prisma --file=./02.src/prisma/repair-existing-db.sql",
+    "db:rebuild": "node scripts/rebuild-db.cjs",
+    "postinstall": "npm run db:generate"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",

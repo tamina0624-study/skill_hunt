@@ -1,8 +1,8 @@
-# Safety Quest 現行DB設計
+# skill hant 現行DB設計
 
 ## 1. 目的
 
-現行アプリの `ナレッジ登録`、`獲得スキル`、`実績登録`、`一覧検索`、`ダッシュボード`、`月次レポート` に対応するDB構造を定義する。
+現行アプリの `獲得ナレッジ`、`スキル登録`、`実績登録`、`一覧検索`、`ダッシュボード`、`月次レポート` に対応するDB構造を定義する。
 
 初期実装ではブラウザの `localStorage` に保存しているが、本設計はPostgreSQLへ移行するためのテーブル構造とする。
 
@@ -42,28 +42,14 @@
 
 ## 5. knowledge_entries
 
-ナレッジ登録画面の内容を保存する。
+獲得ナレッジ画面で指定した年月・本文・KP評価を保存する。3種類のポイント記録は年月カラムを `recordedAt` に統一する。フォームにないリスク・分類・対象などの項目は持たない。
 
 | カラム | 型 | 制約・説明 |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | FK users, index |
-| `occurred_at` | timestamptz | 発生日時、index |
-| `subject` | varchar(200) | ナレッジの対象 |
-| `content` | text | 気づき・学びの内容 |
-| `potential_impact` | text | 想定される影響 |
-| `perceived_cause` | text | 原因の自己認識 |
-| `detection_trigger` | text | 発見契機 |
-| `reuse_idea` | text | 次に活かす工夫 |
-| `impact_level` | enum | `none/minor/occurred` |
-| `status` | enum | `considering/completed` |
-| `categories` | text[] | 分類 |
-| `occurrence_score` | smallint | リスク目安用、1〜5 |
-| `severity_score` | smallint | リスク目安用、1〜5 |
-| `detectability_score` | smallint | リスク目安用、1〜5 |
-| `rpn` | smallint | リスク目安 |
-| `risk_level` | enum | `low/medium/high/critical` |
-| `summary` | text | 一覧表示用の通常要約 |
+| `recordedAt` | timestamptz | フォームで指定した年月、index |
+| `content` | text | ナレッジ本文 |
 | `knowledge_points` | integer | KP |
 | `knowledge_point_reason` | text | AI判定理由 |
 | `created_at` | timestamptz | not null |
@@ -72,26 +58,39 @@
 
 主なインデックス:
 
-- `user_id, occurred_at desc`
-- `user_id, status`
+- `user_id, recordedAt desc`
 
 ## 6. acquired_skills
 
-獲得スキル画面で登録した内容を保存する。
+スキル登録画面のフォーム内容、SP、SP判定理由を保存する。フォームの各項目は対応するカラムへ個別に保存し、タイトルへ連結しない。
 
 | カラム | 型 | 制約・説明 |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | FK users, index |
-| `title` | text | 身についたスキル |
+| `title` | text | スキルの対象 |
+| `description` | text | 気づき・学びの内容 |
+| `confidentiality_confirmed` | boolean | 機密情報がないことの確認 |
+| `potential_impact` | text | 想定される影響、nullable |
+| `perceived_cause` | text | 原因の自己認識、nullable |
+| `detection_trigger` | text | 発見契機、nullable |
+| `reuse_idea` | text | 次に活かす工夫、nullable |
+| `impact_level` | enum | 影響の有無 |
+| `status` | enum | 検討中 / 完了 |
+| `categories` | text[] | 内容から推定したカテゴリ |
+| `occurrence_score` | smallint | 発生頻度評価、nullable |
+| `severity_score` | smallint | 影響度評価、nullable |
+| `detectability_score` | smallint | 検知性評価、nullable |
+| `rpn` | smallint | リスク優先数、nullable |
+| `risk_level` | enum | リスク目安、nullable |
 | `points` | integer | SP |
 | `reason` | text | AI判定理由 |
-| `acquired_at` | timestamptz | 登録日時 |
+| `recordedAt` | timestamptz | フォームで指定した発生日時、index |
 | `created_at` | timestamptz | not null |
 
 主なインデックス:
 
-- `user_id, acquired_at desc`
+- `user_id, recordedAt desc`
 
 ## 7. achievement_records
 
@@ -104,16 +103,16 @@
 | `title` | text | 達成した実績 |
 | `points` | integer | AP |
 | `reason` | text | AI判定理由 |
-| `achieved_at` | timestamptz | 登録日時 |
+| `recordedAt` | timestamptz | フォームで指定した年月、index |
 | `created_at` | timestamptz | not null |
 
 主なインデックス:
 
-- `user_id, achieved_at desc`
+- `user_id, recordedAt desc`
 
 ## 8. monthly_reports
 
-レポート画面で作成した月次評価を保存する。
+レポート画面で指定した年月の月次評価を保存する。3種類の記録テーブルから、`recordedAt` が日本時間の対象月に含まれるデータを集計する。
 
 | カラム | 型 | 制約・説明 |
 |---|---|---|
@@ -162,8 +161,8 @@ KP/SP/AP加算を履歴として保存する。
 | 画面 | 主テーブル | 補足 |
 |---|---|---|
 | ダッシュボード | `knowledge_entries`, `acquired_skills`, `achievement_records`, `monthly_reports`, `point_events` | 件数、EP、推移、最新レポートコメント |
-| ナレッジ登録 | `knowledge_entries`, `point_events` | KP判定後に登録 |
-| 獲得スキル | `acquired_skills`, `point_events` | SP判定後に登録 |
+| 獲得ナレッジ | `knowledge_entries`, `point_events` | KP判定後に登録 |
+| スキル登録 | `acquired_skills`, `point_events` | SP判定後に登録 |
 | 実績登録 | `achievement_records`, `point_events` | AP判定後に登録 |
 | 一覧 | `knowledge_entries`, `acquired_skills`, `achievement_records` | 種別横断検索 |
 | レポート | `monthly_reports` | 月次評価とエンジニア力評価を保存・表示 |
