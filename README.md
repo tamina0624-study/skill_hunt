@@ -4,15 +4,15 @@
 
 ### ログイン
 
-![Safety Quest のGUI](doc/gui-screenshot.png)
+![Safety Quest のGUI](01.doc/gui-screenshot.png)
 
 ### ダッシュボード
 
-![Safety Questのダッシュボード](doc/gui-dashboard.png)
+![Safety Questのダッシュボード](01.doc/gui-dashboard.png)
 
 ### ナレッジ登録
 
-![Safety Questのナレッジ登録画面](doc/gui-knowledge-entry.png)
+![Safety Questのナレッジ登録画面](01.doc/gui-knowledge-entry.png)
 
 Safety Quest は、日々の業務経験を「ナレッジ」「スキル」「実績」として記録し、AI ベースの評価ルールでポイント化し、成長を可視化するための MVP アプリです。
 
@@ -112,43 +112,25 @@ Safety Quest は、日々の業務経験を「ナレッジ」「スキル」「�
 
 ```text
 .
-├── doc/                        # 要件・設計書
-│   ├── 01_requirements_specification.md
-│   ├── 02_basic_design.md
-│   ├── 03_detailed_design.md
-│   ├── 04_test_specification.md
-│   └── 05_current_database_design.md
-├── gui_mock/                   # UI モック
-├── prisma/
-│   └── schema.prisma           # Prisma schema
-├── src/
+├── 00.secret/                 # ローカル専用・Git対象外
+├── 01.doc/                    # 設計資料・画像・gui_mock・作成ルール
+├── 02.src/
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── ai/
-│   │   │   ├── achievements/
-│   │   │   ├── health/
-│   │   │   ├── knowledge/
-│   │   │   ├── reports/
-│   │   │   └── skills/
-│   │   ├── globals.css
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   └── lib/
-│       ├── ai.ts
-│       └── prisma.ts
-├── .gitignore
-├── eslint.config.mjs
-├── next-env.d.ts
-├── next.config.ts
+│   ├── lib/
+│   ├── prisma/schema.prisma
+│   ├── next.config.ts
+│   └── tsconfig.json
+├── 03.log/
+│   ├── prompts.txt
+│   ├── current_status.txt
+│   └── leftover_tasks.txt
 ├── package.json
-├── tsconfig.json
-├── README.md
-└── ...
+└── README.md
 ```
 
 ## 環境変数
 
-ローカル開発時は `.env` に以下を設定します。
+ローカル開発時は `00.secret/.env` に以下を設定します。Next.js と Prisma CLI はこの場所から設定を読み込みます。
 
 ```env
 DATABASE_URL="postgresql://postgres:xxx@db.xxx.supabase.co:5432/postgres?sslmode=require"
@@ -298,3 +280,28 @@ npx prisma db push
 ## ライセンス
 
 本リポジトリのライセンスは未定義です。
+
+## コミット前検査
+
+GitSecurityTool はサブモジュールです。Python 3.11以上を用意して以下を実行します。
+
+```bash
+git submodule update --init --recursive
+.\00.secret\python\python.exe -m pip install pre-commit
+.\00.secret\python\python.exe -m pre_commit install
+```
+
+ローカル専用の検知語はサブモジュール内の GitSecurityTool/keywords.yaml を編集し、サブモジュールの info/exclude で除外します。
+
+この環境では Python 3.13.9 を `00.secret/python/` に配置しています。Python本体と依存関係はGit管理対象外です。別環境ではPython 3.11以上を用意して同等のコマンドを実行してください。
+
+Gitleaks は公式配布の Windows x64 版 8.24.2 を `00.secret/tools/gitleaks.exe` に配置しています。Go は不要です。別のWindows環境では、公式リリースから同版を取得し、同じ場所へ展開してからフックを有効化してください。
+
+```powershell
+New-Item -ItemType Directory -Force 00.secret/tools
+curl.exe -L --fail https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_windows_x64.zip -o 00.secret/gitleaks.zip
+.\00.secret\python\python.exe -m zipfile -e 00.secret/gitleaks.zip 00.secret/tools
+.\00.secret\python\python.exe -m pre_commit install --install-hooks
+```
+
+個人名・会社名などの独自検知はローカルの `GitSecurityTool/GitSecurityTool/keywords.yaml` に設定してください。未設定の独自キーワード検査は検知を行いません。

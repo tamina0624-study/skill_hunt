@@ -1,5 +1,5 @@
 WebServer:Renderの無料サーバー
-DB：Supabase 
+DB：Supabase
 AI：OpenRouterの無料AIエージェント
 
 WebServerからDBへのアクセスは

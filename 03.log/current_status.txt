@@ -1,0 +1,16 @@
+更新日: 2026-10-19
+完了: 資料・実装・開発記録を番号付きフォルダーへ整理。起動設定・参照パスを更新。
+完了: GitSecurityToolサブモジュールとpre-commit設定を追加。.envは内容を保持してGit追跡解除。
+検証: 本番ビルド、TypeScript型チェック、Prisma validate成功。lintはエラーなし（既存の未使用変数の警告2件）。
+残課題: Python未導入のためpre-commitのインストール・フック有効化は未実施。
+
+更新日: 2026-10-19
+完了: 00.secret/pythonにPython 3.13.9とpre-commit 4.7.0を導入。フック登録と設定検証成功。検知語・検知ログをサブモジュールのinfo/excludeに登録。
+完了: 公式Gitleaks 8.24.2のWindowsバイナリを00.secret/toolsへ導入。Goによるビルドを不要化。
+検証: package.jsonを対象とした全12フックが成功。全リポジトリの検査ではない。独自キーワードは未設定。
+
+2026-10-19: 基本設計書のHTML版（01.doc/02_basic_design.html）を作成。既存の全10章を収録し、外部依存なしの構成図2点、目次、レスポンシブ・A4印刷用スタイルを追加。
+
+2026-10-19: 現行コードを基準に詳細設計書HTML（01.doc/03_detailed_design.html）を作成。画面・API・全6DBモデル・評価・レポート・エラー・実装上の制約を収録。内部リンク、参照ファイル、主要タグの対応、DBモデル収録を検査。アプリの実行試験は未実施。
+
+2026-10-19: .envを00.secret/.envへ内容を維持して移動。Next.jsの読込先とPrisma CLI用prisma.config.tsを設定し、README・詳細設計HTMLを更新。

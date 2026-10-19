@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
+    "dev": "next dev 02.src",
+    "build": "next build 02.src",
+    "start": "next start 02.src",
+    "lint": "eslint 02.src",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate"
   },
@@ -25,5 +25,8 @@
     "eslint": "^9.34.0",
     "eslint-config-next": "^15.5.2",
     "prisma": "^6.15.0"
+  },
+  "prisma": {
+    "schema": "02.src/prisma/schema.prisma"
   }
 }

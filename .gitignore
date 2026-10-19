@@ -1,4 +1,8 @@
+00.secret/
 .env
-.env.local
 .env.*
-node_modules
+!.env.example
+node_modules/
+.next/
+out/
+*.tsbuildinfo

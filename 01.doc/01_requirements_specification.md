@@ -134,4 +134,4 @@ flowchart TD
 
 ## 11. 現行MVPの保存方式
 
-画面実装はブラウザの `localStorage` に保存している。DB移行用の正式構造は `prisma/schema.prisma` と `doc/05_current_database_design.md` に定義する。
+画面実装はブラウザの `localStorage` に保存している。DB移行用の正式構造は `02.src/prisma/schema.prisma` と `01.doc/05_current_database_design.md` に定義する。

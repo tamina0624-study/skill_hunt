@@ -171,13 +171,13 @@ KP/SP/AP加算を履歴として保存する。
 
 ## 11. Prisma schema
 
-現行設計に対応するPrisma schemaは `prisma/schema.prisma` に定義する。
+現行設計に対応するPrisma schemaは `02.src/prisma/schema.prisma` に定義する。
 
 ## 12. 関連フォルダ
 
 | フォルダ | 役割 |
 |---|---|
-| `src/app` | Next.js App Routerの画面実装 |
+| `02.src/app` | Next.js App Routerの画面実装 |
 | `prisma` | DB schemaと将来のマイグレーション |
 | `doc` | 要件定義、基本設計、詳細設計、テスト仕様、DB設計 |
 | `gui_mock` | 初期検討時の静的モック |

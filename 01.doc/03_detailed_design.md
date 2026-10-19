@@ -3,8 +3,8 @@
 ## 1. 共通規約
 
 - ソースコードは `src` 配下に配置する。
-- Next.js App Routerは `src/app` を使用する。
-- DB定義は `prisma/schema.prisma` に配置する。
+- Next.js App Routerは `02.src/app` を使用する。
+- DB定義は `02.src/prisma/schema.prisma` に配置する。
 - 設計書は `doc` 配下に配置する。
 - DBはPostgreSQLを想定する。
 - 主キーはUUIDとする。
@@ -158,7 +158,7 @@ AI分析は実行しない。
 | `AiReport` | 月次評価、エンジニア力評価、対象年月 |
 | `SearchListItem` | 一覧画面の横断検索結果 |
 
-DB移行時の正式テーブルは `doc/05_current_database_design.md` を参照する。
+DB移行時の正式テーブルは `01.doc/05_current_database_design.md` を参照する。
 
 ## 4. 計算ロジック
 
@@ -213,7 +213,7 @@ level = floor(sqrt(totalEP / 100)) + 1
 
 ## 5. DB詳細
 
-Prisma schemaは `prisma/schema.prisma` に定義する。
+Prisma schemaは `02.src/prisma/schema.prisma` に定義する。
 
 主要テーブル:
 

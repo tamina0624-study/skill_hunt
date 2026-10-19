@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Safety Quest 詳細設計書</title>
+<style>
+:root{--ink:#193047;--muted:#586a7c;--line:#dbe4eb;--accent:#087f8c}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:#f3f6f9;font:15px/1.85 system-ui,"Yu Gothic",sans-serif}header{padding:48px max(6vw,24px);background:#15354b;color:white}header p{color:#c9e2eb;margin:6px 0}h1{font-size:34px;margin:8px 0}h2{border-bottom:2px solid var(--accent);padding-bottom:9px;margin-top:0;font-size:24px}h3{margin-top:28px;font-size:18px}main{max-width:1160px;margin:28px auto;padding:0 24px}nav,section{background:white;border:1px solid var(--line);border-radius:12px;padding:28px;margin-bottom:24px}nav ol{columns:2;margin:0}a{color:#076e86}code,pre{font-family:Consolas,monospace;font-size:.92em}code{overflow-wrap:anywhere}pre{padding:18px;background:#edf3f7;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:6px}table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0;table-layout:fixed}th,td{padding:10px 12px;border:1px solid var(--line);text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#edf4f7}p{margin:12px 0}.note{background:#fff8e8;border-left:4px solid #d69b2b;padding:12px 18px}.flow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.flow span{border:1px solid #a9cad3;background:#eff8fa;border-radius:8px;padding:12px}.meta{font-size:13px;color:var(--muted)}footer{text-align:center;padding:20px;color:var(--muted)}section{scroll-margin-top:16px}@media(max-width:700px){main{padding:0 12px}section,nav{padding:18px}nav ol{columns:1}h1{font-size:27px}table{font-size:12px}th,td{padding:7px}}@media print{@page{size:A4;margin:15mm}body{background:white;font-size:10pt}header{background:white;color:#193047;padding:10px 0}header p{color:#586a7c}main{padding:0;margin:0;max-width:none}section,nav{border:0;padding:10px 0;border-radius:0}h2,h3{break-after:avoid}tr,pre,.flow{break-inside:avoid}a{color:inherit;text-decoration:none}footer{font-size:9pt}}
+</style>
+</head>
+<body>
+<header><p>SAFETY QUEST / ENGINEERING DOCUMENTATION</p><h1>詳細設計書</h1><p>業務経験をナレッジ・スキル・実績として蓄積するMVP</p><p>作成日：2026年10月19日 ｜ 基準：作成時点のローカル実装 ｜ 文書版：1.0</p></header>
+<main>
+<nav aria-label="目次"><h2>目次</h2><ol><li><a href="#scope">対象・構成</a></li><li><a href="#state">状態管理・初期化</a></li><li><a href="#screens">画面・入力設計</a></li><li><a href="#flows">登録・削除処理</a></li><li><a href="#api">API仕様</a></li><li><a href="#evaluation">評価・集計ロジック</a></li><li><a href="#reports">月次レポート</a></li><li><a href="#database">データベース</a></li><li><a href="#errors">エラー・セキュリティ</a></li><li><a href="#operation">設定・実行</a></li><li><a href="#gaps">実装上の制約・確認観点</a></li><li><a href="#sources">参照ソース</a></li></ol></nav>
+<section id="scope"><h2>1. 対象・構成</h2><p>対象は <code>02.src</code> 配下のSafety Questアプリケーション、Prismaスキーマおよびルートの実行設定。GitSecurityToolサブモジュールの内部仕様は対象外。本書はコードから読み取れる現在の動作を記載し、将来構想と区別する。既存Markdown設計書は上書きしない。</p><table><thead><tr><th>層</th><th>実装・責務</th></tr></thead><tbody><tr><td>画面</td><td>Next.js 15.5系 / React 19.1系 / TypeScript 5.9系。<code>app/page.tsx</code>のClient Componentで画面・状態・集計を管理。<code>globals.css</code>で表示を定義。</td></tr><tr><td>API</td><td>App Router Route Handlers。全エンドポイントのruntimeはnodejs。</td></tr><tr><td>データアクセス</td><td>Prisma 6.15系 / PostgreSQL。開発時はglobalThisにClientを再利用し、query・error・warnをログ出力。本番はerrorのみ。</td></tr><tr><td>AI</td><td><code>lib/ai.ts</code>でOpenRouterへ接続。キー未設定・呼び出し失敗時はルール評価へフォールバック。</td></tr></tbody></table><div class="flow" aria-label="構成図"><span>ブラウザー<br>画面・localStorage</span>→<span>Next.js API<br>登録 / 取得 / 削除</span>→<span>Prisma<br>PostgreSQL</span></div><p class="meta">AI評価はブラウザー → /api/ai → OpenRouter またはローカルルール。月次コメントと整理メモは定型ロジック。</p></section>
+<section id="state"><h2>2. 状態管理・初期化</h2><table><thead><tr><th>状態</th><th>内容</th></tr></thead><tbody><tr><td>AppState</td><td>userEmail、totalXp、selectedId、nearMisses、quests、acquiredSkills、achievementRecords、reports、latestReport（任意）、bossEnabled。</td></tr><tr><td>DraftForm</td><td>発生日時、対象、本文、想定影響、原因、発見契機、工夫、影響区分、状態、機密確認。画面内の一時状態でありAppStateには含めない。</td></tr><tr><td>画面補助状態</td><td>page、任意詳細の開閉、検索条件、チャット入力と会話、loaded。AIプレビューは評価結果・評価時入力・処理中・エラーを独立保持。</td></tr><tr><td>localStorage</td><td>キー：<code>safety-quest-state-v1</code>。初期読み込み完了後、AppStateの変更ごとにJSON保存。</td></tr></tbody></table><ol><li>初回描画時はサンプルを含むinitialStateを使用。</li><li>refreshServerStateでknowledge・skills・achievementsのGETを並列実行。</li><li>保存済みlocalStorageを基礎に、成功したAPIの配列のみDB結果へ置換。</li><li>全3種のポイントからtotalXpを再集計し、最初のナレッジをselectedIdに設定。</li><li>例外時は保存状態、なければ呼び出し元のfallbackStateを返す。</li></ol><p>DBのsubject → workContext、content → description、reuseIdea → userCountermeasure、impactLevel → actualHarm、summary → aiSummaryへ変換。DB読込時のcountermeasuresは空配列、bossはriskLevelがcriticalの場合にtrue。</p><p class="note">起動時にレポートGETは呼ばれない。画面のレポート履歴はlocalStorageから引き継ぐ。API非成功時には一部データだけが更新される場合がある。</p></section>
+<section id="screens"><h2>3. 画面・入力設計</h2><p>URLは <code>/</code> のまま、page状態で7画面を切り替える。userEmailが空の場合はログイン画面を表示する。</p><table><thead><tr><th>画面 / 関数</th><th>表示・操作</th></tr></thead><tbody><tr><td>ログイン / LoginView</td><td>メール入力をuserEmailへ格納。入力が空ならdemo@example.com。サーバー認証・セッション発行は行わない。</td></tr><tr><td>dashboard / DashboardView</td><td>今月・累計ナレッジ数、今月EP、総EP、登録数とEPの推移、評価コメント。最新保存レポートがあればコメントに優先使用。</td></tr><tr><td>create / CreateView</td><td>ナレッジ入力、任意詳細の開閉、AIプレビュー、整理メモ。新規開始はフォームと会話を初期化。</td></tr><tr><td>quests / QuestView</td><td>年月・スキル本文、AIプレビュー、登録。画面キーは旧クエスト名を継続使用。</td></tr><tr><td>achievements / AchievementView</td><td>年月・実績本文、AIプレビュー、登録。</td></tr><tr><td>list / ListView</td><td>検索語、種別、ナレッジ状態、削除。ナレッジ選択で入力画面へ展開。スキル・実績は参照のみ。</td></tr><tr><td>reports / ReportView</td><td>年・月を選び保存済み結果を表示。生成ボタンは選択月に関係なく現在のUTC年月を送信。</td></tr><tr><td>settings / SettingsView</td><td>Asia/Tokyo、毎月1日07:00を読取専用表示。初期化はlocalStorageの対象キー削除と再読込。DBは削除しない。</td></tr></tbody></table><h3>3.1 ナレッジ入力</h3><table><thead><tr><th>項目 / フィールド</th><th>UI制約・初期値</th><th>DB対応</th></tr></thead><tbody><tr><td>発生日時 / occurredAt</td><td>datetime-local、required。端末ローカル現在日時。</td><td>occurredAt</td></tr><tr><td>影響 / actualHarm</td><td>none（初期）・minor・occurred</td><td>impactLevel</td></tr><tr><td>状態 / status</td><td>considering（初期）・completed</td><td>status</td></tr><tr><td>対象 / workContext</td><td>required、最大200文字、前後空白除去</td><td>subject</td></tr><tr><td>学び / description</td><td>required、最大2,000文字、前後空白除去</td><td>content</td></tr><tr><td>想定影響・原因・発見契機</td><td>任意textarea。未入力はAPIでnull。</td><td>potentialImpact / perceivedCause / detectionTrigger</td></tr><tr><td>次に活かす工夫 / userCountermeasure</td><td>任意textarea</td><td>reuseIdea</td></tr><tr><td>機密確認 / confidentialityConfirmed</td><td>初期false。登録関数でtrueを必須化。</td><td>送信・保存しない</td></tr></tbody></table><h3>3.2 検索</h3><p>入力と検索適用値を分けて保持。NFKC正規化、日本語ロケール小文字化、連続空白の圧縮後、単語ごとのAND部分一致で検索。本文・理由・日時・ポイント等も対象。種別別にナレッジ、スキル、実績の順で結合し、全種横断の日付ソートは行わない。状態指定がある場合、スキルと実績は除外。</p><h3>3.3 AI整理メモ</h3><p>buildDraftContextで入力内容を連結し、buildDraftCoachReplyでローカル応答を生成する。外部AIは呼ばない。画面には会話の末尾5件を表示。「下書きを反映」は会話と相談入力を消去し、登録フォームを保持する。</p></section>
+<section id="flows"><h2>4. 登録・削除処理</h2><h3>4.1 ナレッジ登録</h3><ol><li>対象・本文・機密確認を検証。不足時は処理終了。</li><li>フォームからリスク値とカテゴリを推定。変更されていないAI評価があればhidden入力から取得。</li><li>POST /api/knowledgeで新規作成。APIは評価指定を優先し、未指定時はルール計算。</li><li>成功時は3種のGETで状態を再読込。</li><li>フォーム・任意詳細・会話を初期化し、登録画面を表示。</li></ol><p class="note">既存ナレッジの展開後もPOSTで新規作成する。更新APIはない。またHTTPエラーでもフォーム初期化へ進む。通信例外のcatchは登録関数にない。</p><h3>4.2 スキル・実績</h3><p>本文をtrimし、空なら終了。title・yearMonth・任意aiEvaluationをPOST。成功時は状態を再取得。年月はAPIで月初00:00 UTCへ変換し、未指定時は現在日時を使用。</p><h3>4.3 削除</h3><p>window.confirmで確認 → 種別APIへDELETE?id=… → 成功なら状態再取得。HTTPエラー時はalertを表示。ナレッジはdeletedAt更新の論理削除、スキル・実績はdeleteManyの物理削除。いずれもデモユーザーIDを条件に含める。</p></section>
+<section id="api"><h2>5. API仕様</h2><p>JSON入出力。DBを扱う各APIはemailがdemo@example.comのUserをupsertして利用する。ブラウザーのログインメールは送信しない。PATCH / PUTは未実装。</p><table><thead><tr><th>メソッド・パス</th><th>入力</th><th>成功レスポンス</th></tr></thead><tbody><tr><td>GET /api/knowledge</td><td>なし</td><td>200：deletedAt=nullのKnowledgeEntry配列、createdAt降順</td></tr><tr><td>POST /api/knowledge</td><td>下記マッピング参照</td><td>201：作成したKnowledgeEntry</td></tr><tr><td>DELETE /api/knowledge</td><td>query：id（必須）</td><td>204：本文なし、論理削除</td></tr><tr><td>GET /api/skills</td><td>なし</td><td>200：AcquiredSkill配列、acquiredAt降順</td></tr><tr><td>POST /api/skills</td><td>title必須、yearMonth・aiEvaluation任意</td><td>201：作成したAcquiredSkill</td></tr><tr><td>DELETE /api/skills</td><td>query：id（必須）</td><td>204：本文なし</td></tr><tr><td>GET /api/achievements</td><td>なし</td><td>200：AchievementRecord配列、achievedAt降順</td></tr><tr><td>POST /api/achievements</td><td>title必須、yearMonth・aiEvaluation任意</td><td>201：作成したAchievementRecord</td></tr><tr><td>DELETE /api/achievements</td><td>query：id（必須）</td><td>204：本文なし</td></tr><tr><td>GET /api/reports</td><td>query：yearMonth任意</td><td>200：指定なしはDBモデル配列（generatedAt降順）、指定ありはDBモデル1件</td></tr><tr><td>POST /api/reports</td><td>yearMonth必須</td><td>201：id・periodKey・generatedAt・periodLabel・monthlyEvaluation・engineerEvaluation</td></tr><tr><td>POST /api/ai</td><td>kind（既定knowledge）、title、content、extraContext</td><td>200：points・reason・任意riskLevel。title/contentの片方は必須。</td></tr><tr><td>GET /api/health</td><td>なし</td><td>200：{ok:true,time:ISO日時,database:"prisma-ready"}。DBクエリは行わない。</td></tr></tbody></table><h3>5.1 ナレッジPOSTの補足</h3><p>workContext・descriptionはtrim後必須。occurredAt未指定は現在時刻。actualHarmはminor/occurred以外をnoneへ、statusはcompleted以外をconsideringへ変換。categoriesは配列のみ受け付け、偽値除外・文字列化・先頭5件。occurrence/severity/detectabilityはNumber変換、各既定3。rpn既定27。riskLevelは4列挙値以外low。summaryは「{subject}で得た気づきを記録しました。」。</p><h3>5.2 リクエスト例</h3><pre>POST /api/skills
+Content-Type: application/json
+
+{
+  "title": "テスト自動化スクリプトの作成",
+  "yearMonth": "2026-10",
+  "aiEvaluation": { "points": 50, "reason": "検証の自動化に関するスキルです。" }
+}</pre><p>日付はJSON上で文字列。GETレスポンスはPrismaモデルをそのまま返すためuserIdなども含む。レポートGETは保存列の平坦構造、POSTは画面向けの評価オブジェクト構造であり互換ではない。</p></section>
+<section id="evaluation"><h2>6. 評価・集計ロジック</h2><h3>6.1 登録値の決定順</h3><p>有効なaiEvaluation → 登録API固有のルール。aiEvaluationはpointsをNumber変換して有限数か確認し、0～100へ制限して四捨五入。reasonは文字列化・trim後必須。API側で外部AIへ再照会しない。</p><p>AIプレビューはtitle/content/extraContextのJSONを比較し、評価後に入力が変われば古い結果と表示する。古い結果のhidden入力は除去され、登録APIのルール計算へ戻る。</p><h3>6.2 KP（登録APIの未評価時）</h3><table><thead><tr><th>条件</th><th>点数</th></tr></thead><tbody><tr><td>基本点</td><td>10</td></tr><tr><td>descriptionが30文字以上</td><td>+10</td></tr><tr><td>detectionTriggerが空でない</td><td>+10</td></tr><tr><td>perceivedCauseが空でない</td><td>+10</td></tr><tr><td>対象・本文・任意4項目に「チェック|レビュー|自動|検証|監視|手順|防止」のいずれか</td><td>+10</td></tr><tr><td>riskLevelがhighまたはcritical</td><td>+10</td></tr></tbody></table><p>上限60KP。AIプレビューのfallbackEvaluation(knowledge)は別ルール：基本10、trim後content30文字以上、発見関連語、原因対策関連語、高リスク関連語で各+10。現行条件では最大50。リスクは40点以上high、25点以上medium、それ以外low。criticalは返さない。したがってプレビュー評価の有無で登録点数が変わり得る。</p><h3>6.3 SP / AP</h3><p>小文字化した入力を上位行から判定し、最初に一致する値を使用。登録APIはtitleを判定し、AIフォールバックはtitleとcontentを連結して判定。</p><table><thead><tr><th>点数</th><th>SPの判定語（正規表現の選択肢）</th><th>APの判定語</th></tr></thead><tbody><tr><td>50</td><td>自動 / テスト / 監視 / ci / cd / script / スクリプト / lint / 検証</td><td>障害 / 本番 / リリース / 改善 / 自動 / 削減 / 解決 / 復旧 / 設計</td></tr><tr><td>30</td><td>設計 / レビュー / 分析 / 改善 / 再発 / 原因 / 要件 / 仕様</td><td>レビュー / 共有 / 資料 / 標準化 / 手順 / 教育 / 支援 / 提案</td></tr><tr><td>20</td><td>確認 / 手順 / チェック / 共有 / 記録 / 整理</td><td>対応 / 確認 / 調査 / 整理 / 記録</td></tr><tr><td>10</td><td>いずれも一致しない</td><td>いずれも一致しない</td></tr></tbody></table><h3>6.4 リスク・カテゴリ</h3><pre>occurrence = 工夫に「注意」を含む ? 4 : 3
+severity = 影響あり(occurred) ? 5 : 想定影響あり ? 4 : 3
+detectability = 発見契機あり ? 3 : 4
+RPN = occurrence × severity × detectability
+RPN &gt;= 80 : critical / &gt;= 50 : high / &gt;= 20 : medium / その他 : low</pre><p>現在の推定値の最大積は80。カテゴリは13候補から対象・本文・原因・工夫の語句一致で推定し、レビュー・確認/照合の補助判定を追加、重複除去して最大3件。該当なしは「その他」。</p><h3>6.5 EP・レベル・グラフ</h3><pre>再読込後のtotalXp = Σ knowledgePoints + Σ skill.points + Σ achievement.points
+level = floor(sqrt(totalXp / 100)) + 1
+今月の成長 = 今月KP + 今月SP + 今月AP + 今月の付与済みquest.xp</pre><p>totalXpは画面上EPとして扱う。今月判定は端末ローカルの年・月。登録数グラフは発生日時順に1ずつ累積。EPグラフは付与済みクエストと3種の登録を日付順で累積し、開始値はmax(0, 総EP−イベント合計)。SVGは720×220の座標系、余白34、Y軸上限の最低値100。</p><h3>6.6 外部AI</h3><p>キー設定時は <code>https://openrouter.ai/api/v1/chat/completions</code> へPOST。Bearer認証、HTTP-Referer、X-Titleを付与。systemでJSON、0～100の整数点、4値リスク、日本語理由を指示。userにkind/title/content/extraContextをJSON化し、response_format=json_objectを指定。</p><p>choices[0].message.contentをJSON解析。pointsがnumberなら0～100へ制限し、理由欠落時は既定文。実装では整数丸め・riskLevelの厳密検証は行わない。非2xx、解析例外、points欠落はルールへ戻す。明示的なタイムアウト・再試行はない。</p></section>
+<section id="reports"><h2>7. 月次レポート</h2><ol><li>yearMonthを分解し、UTCの当月1日00:00をstart、翌月1日00:00をendとする。</li><li>occurredAt / acquiredAt / achievedAtが[start,end)の3種レコードとUserを並列取得。</li><li>件数とKP/SP/APを合算しmonthlyGrowthを算出。総EPはUser.totalEpを取得。</li><li>0件時または登録ありの場合の定型月次文、総EP・成長を埋め込んだ定型エンジニア評価を生成。</li><li>userId+periodKeyでupsertし、再生成時は期間・生成時刻・評価・snapshotJsonを上書き。</li></ol><p>snapshotJsonはknowledgeCount、skillCount、achievementCount、knowledgePoints、skillPoints、achievementPoints、totalEp、monthlyGrowthの9値。periodEndは翌月開始の排他的境界。外部AIは使用しない。</p><p>画面は成功応答を同年月の既存レポートと入れ替える。HTTP非成功時はbuildAiReportのローカル版を作り保存する。通信自体がrejectした場合のcatchはない。getSavedReportsは旧latestReportも統合し、年月を正規化して同月重複を解消する。</p><p class="note">レポート集計にはdeletedAt=null条件がなく、論理削除済みナレッジも含む。登録APIはUser.totalEpを更新しないため、画面の総EPとレポートの総EPが一致しない可能性がある。</p></section>
+<section id="database"><h2>8. データベース</h2><p>定義元：<code>02.src/prisma/schema.prisma</code>。以下の全モデルはUUID主キー、Prismaの@@mapで物理テーブル名を指定。フィールド名の@map指定はない。</p><table><thead><tr><th>モデル / テーブル</th><th>役割・主な制約</th></tr></thead><tbody><tr><td>User / users</td><td>email一意、表示名、タイムゾーン、通知予定、総EP。全子モデルへの1対多。</td></tr><tr><td>KnowledgeEntry / knowledge_entries</td><td>学び・リスク・KP・削除日時。索引(userId,occurredAt DESC)、(userId,status)。</td></tr><tr><td>AcquiredSkill / acquired_skills</td><td>スキル名・SP・理由・獲得日時。索引(userId,acquiredAt DESC)。</td></tr><tr><td>AchievementRecord / achievement_records</td><td>実績名・AP・理由・達成日時。索引(userId,achievedAt DESC)。</td></tr><tr><td>MonthlyReport / monthly_reports</td><td>対象期間・評価文・集計JSON。一意(userId,periodKey)、索引(userId,generatedAt DESC)。</td></tr><tr><td>PointEvent / point_events</td><td>種別・付与元・点数・理由・任意参照先。idempotencyKey一意、索引(userId,createdAt DESC)、(userId,pointType)。現行APIでは作成しない。</td></tr></tbody></table><div class="flow" aria-label="関連図"><span>User</span>1 → N<span>KnowledgeEntry / AcquiredSkill<br>AchievementRecord / MonthlyReport / PointEvent</span></div><p>PointEventは各登録モデルへ任意の多対1参照を持つ。Userおよび各参照先の削除はonDelete: Cascade。付与元に応じて参照先を1つに限定するCHECK制約はスキーマにない。クエストの正式DBモデルはない。</p><h3>8.1 全フィールド定義</h3><p class="meta">以下は作成時のPrismaスキーマから収録。?は任意、[]は配列、@defaultは既定値。StringのDB型未指定はPostgreSQLのtextに対応する。</p>
+<h3>User</h3><pre>model User {
+  id                 String              @id @default(uuid()) @db.Uuid
+  email              String              @unique @db.VarChar(320)
+  displayName        String              @db.VarChar(100)
+  timezone           String              @default(&quot;Asia/Tokyo&quot;) @db.VarChar(64)
+  monthlyReportDay   Int                 @default(1) @db.SmallInt
+  monthlyReportTime  DateTime            @default(dbgenerated(&quot;'07:00:00'::time&quot;)) @db.Time(0)
+  totalEp            Int                 @default(0)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  knowledgeEntries   KnowledgeEntry[]
+  acquiredSkills     AcquiredSkill[]
+  achievementRecords AchievementRecord[]
+  monthlyReports     MonthlyReport[]
+  pointEvents        PointEvent[]
+
+  @@map(&quot;users&quot;)
+}</pre>
+<h3>KnowledgeEntry</h3><pre>model KnowledgeEntry {
+  id                   String          @id @default(uuid()) @db.Uuid
+  userId               String          @db.Uuid
+  occurredAt           DateTime        @db.Timestamptz(3)
+  subject              String          @db.VarChar(200)
+  content              String
+  potentialImpact      String?
+  perceivedCause       String?
+  detectionTrigger     String?
+  reuseIdea            String?
+  impactLevel          ImpactLevel     @default(none)
+  status               KnowledgeStatus @default(considering)
+  categories           String[]        @default([])
+  occurrenceScore      Int?            @db.SmallInt
+  severityScore        Int?            @db.SmallInt
+  detectabilityScore   Int?            @db.SmallInt
+  rpn                  Int?            @db.SmallInt
+  riskLevel            RiskLevel?
+  summary              String
+  knowledgePoints      Int             @default(0)
+  knowledgePointReason String
+  createdAt            DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime        @updatedAt @db.Timestamptz(3)
+  deletedAt            DateTime?       @db.Timestamptz(3)
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointEvents          PointEvent[]
+
+  @@index([userId, occurredAt(sort: Desc)])
+  @@index([userId, status])
+  @@map(&quot;knowledge_entries&quot;)
+}</pre>
+<h3>AcquiredSkill</h3><pre>model AcquiredSkill {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @db.Uuid
+  title      String
+  points     Int          @default(0)
+  reason     String
+  acquiredAt DateTime     @db.Timestamptz(3)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointEvents PointEvent[]
+
+  @@index([userId, acquiredAt(sort: Desc)])
+  @@map(&quot;acquired_skills&quot;)
+}</pre>
+<h3>AchievementRecord</h3><pre>model AchievementRecord {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  title       String
+  points      Int          @default(0)
+  reason      String
+  achievedAt  DateTime     @db.Timestamptz(3)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointEvents PointEvent[]
+
+  @@index([userId, achievedAt(sort: Desc)])
+  @@map(&quot;achievement_records&quot;)
+}</pre>
+<h3>MonthlyReport</h3><pre>model MonthlyReport {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @db.Uuid
+  periodKey          String   @db.VarChar(7)
+  periodStart        DateTime @db.Timestamptz(3)
+  periodEnd          DateTime @db.Timestamptz(3)
+  generatedAt        DateTime @default(now()) @db.Timestamptz(3)
+  monthlyTitle       String
+  monthlyMessage     String
+  monthlyFocus       String
+  engineerTitle      String
+  engineerMessage    String
+  engineerNextAction String
+  snapshotJson       Json
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodKey])
+  @@index([userId, generatedAt(sort: Desc)])
+  @@map(&quot;monthly_reports&quot;)
+}</pre>
+<h3>PointEvent</h3><pre>model PointEvent {
+  id                  String           @id @default(uuid()) @db.Uuid
+  userId              String           @db.Uuid
+  pointType           PointType
+  sourceType          PointSourceType
+  knowledgeEntryId    String?          @db.Uuid
+  acquiredSkillId     String?          @db.Uuid
+  achievementRecordId String?          @db.Uuid
+  points              Int
+  reason              String
+  idempotencyKey      String           @unique
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  knowledgeEntry      KnowledgeEntry?  @relation(fields: [knowledgeEntryId], references: [id], onDelete: Cascade)
+  acquiredSkill       AcquiredSkill?   @relation(fields: [acquiredSkillId], references: [id], onDelete: Cascade)
+  achievementRecord   AchievementRecord? @relation(fields: [achievementRecordId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, pointType])
+  @@map(&quot;point_events&quot;)
+}</pre>
+<h3>8.2 列挙値</h3><pre>ImpactLevel: none / minor / occurred
+KnowledgeStatus: considering / completed
+RiskLevel: low / medium / high / critical
+PointType: KP / SP / AP
+PointSourceType: knowledge / skill / achievement / quest</pre></section>
+<section id="errors"><h2>9. エラー・セキュリティ</h2><table><thead><tr><th>条件</th><th>実装上の応答・動作</th></tr></thead><tbody><tr><td>ナレッジ対象・本文不足</td><td>400：workContext and description are required</td></tr><tr><td>スキル・実績title不足</td><td>400：title is required</td></tr><tr><td>DELETEのid不足 / 対象なし</td><td>400：id is required / 404：knowledge entry、skill、achievementそれぞれのnot found</td></tr><tr><td>レポート年月不足 / 指定月なし</td><td>400：yearMonth is required / 404：report not found</td></tr><tr><td>AIのtitle・contentとも空</td><td>400：title or content is required</td></tr><tr><td>AI通信・解析失敗</td><td>サーバーでルール評価へ戻す。プレビューAPI自体の失敗は画面内エラー。</td></tr><tr><td>DB例外・不正JSON等</td><td>Route Handler共通の捕捉・エラー形式は未定義。正常系JSONと同じ形式の保証はない。</td></tr></tbody></table><p>現行は固定デモユーザーのため実ユーザー認証・所有者分離を提供しない。aiEvaluationはクライアント指定値を採用するため、評価結果のサーバー検証や署名はない。機密確認は画面側のみで、API直接呼び出しでは検証されない。</p><p>maskSecretsは秘密鍵・Bearerトークン・key/token/password/secretの代入表現を置換するが、整理メモの補助データに限定される。元の相談文も保持・表示され、AI評価APIへ送る入力やDB保存データを一律にマスキングする処理ではない。</p></section>
+<section id="operation"><h2>10. 設定・実行</h2><table><thead><tr><th>設定</th><th>用途</th></tr></thead><tbody><tr><td>DATABASE_URL</td><td>PrismaのPostgreSQL接続文字列。実値は本書に含めない。</td></tr><tr><td>OPENROUTER_API_KEY</td><td>外部AI認証。未設定時はルール評価。</td></tr><tr><td>OPENROUTER_MODEL</td><td>未設定時openai/gpt-4o-mini。</td></tr><tr><td>NEXT_PUBLIC_APP_URL</td><td>AIのHTTP-Referer。未設定時http://localhost:3000。</td></tr></tbody></table><p>next.config.tsでプロジェクトルートの環境変数をloadEnvConfigにより読み込む。package.jsonのprisma.schemaは02.src/prisma/schema.prismaを指す。</p><pre>npm install
+npm run db:generate
+npm run db:validate
+npx prisma db push
+npm run dev
+
+# ビルド・起動・静的検査
+npm run build
+npm run start
+npm run lint</pre><p class="meta">上記は実装設定に基づく操作手順。db pushはDBへの変更を伴う。本書作成ではDB接続・外部AI呼び出し・アプリの動作試験を実施していない。</p></section>
+<section id="gaps"><h2>11. 実装上の制約・確認観点</h2><p>以下は現状の記録であり、本書作成に伴うコード修正は行っていない。</p><table><thead><tr><th>論点</th><th>現状と確認すべき動作</th></tr></thead><tbody><tr><td>EPの整合</td><td>画面は3種データを再集計、今月成長・グラフは旧クエストも加算。レポートは更新されていないUser.totalEpを参照。既存クエストありの表示差を確認。</td></tr><tr><td>論理削除</td><td>一覧GETでは除外、月次集計では未除外。削除後の再生成結果を確認。</td></tr><tr><td>既存レコード再登録</td><td>一覧から開いて登録すると新規作成。更新と誤認しない画面運用が必要。</td></tr><tr><td>年月とタイムゾーン</td><td>レポートAPIはUTC境界、ダッシュボードは端末ローカル月、生成月はUTC。datetime-local送信値にオフセットがなくサーバー依存。月末・月初を確認。</td></tr><tr><td>レポート永続性</td><td>DBに保存するが起動時の履歴取得なし。ブラウザー初期化後にDB履歴は画面復元されない。</td></tr><tr><td>入力検証</td><td>年月書式、日付妥当性、数値の範囲、本文長、kindの列挙検証がAPIで不十分。リスク積の再計算も行わない。</td></tr><tr><td>登録失敗・多重送信</td><td>保存エラー時の案内・フォーム維持や送信ロックが不足。PointEventの冪等キーは現行登録処理で利用しない。</td></tr><tr><td>AI評価差</td><td>未評価、最新プレビュー、入力変更後、外部AI失敗の各経路で点数・理由・リスクを確認。</td></tr><tr><td>運用機能</td><td>通知設定は読取表示のみ。自動通知ジョブ・実認証・ポイント台帳更新は未実装。</td></tr></tbody></table><p>最低限のレビュー例：必須項目400、削除対象なし404、削除成功204、同年月upsert、検索の全半角・複数語AND、状態指定時の種別除外、AI未設定時のフォールバック、ストレージ消去後のDB再読込。本書では確認観点を列挙しており、実行済み試験を意味しない。</p></section>
+<section id="sources"><h2>12. 参照ソース</h2><ul><li><a href="../02.src/app/page.tsx">02.src/app/page.tsx</a>：型、画面、集計、登録、整理メモ、ローカル保存</li><li><a href="../02.src/app/api/knowledge/route.ts">api/knowledge/route.ts</a>・<a href="../02.src/app/api/skills/route.ts">api/skills/route.ts</a>・<a href="../02.src/app/api/achievements/route.ts">api/achievements/route.ts</a>：取得・登録・削除</li><li><a href="../02.src/app/api/reports/route.ts">api/reports/route.ts</a>・<a href="../02.src/app/api/ai/route.ts">api/ai/route.ts</a>・<a href="../02.src/app/api/health/route.ts">api/health/route.ts</a></li><li><a href="../02.src/lib/ai.ts">lib/ai.ts</a>・<a href="../02.src/lib/prisma.ts">lib/prisma.ts</a></li><li><a href="../02.src/prisma/schema.prisma">prisma/schema.prisma</a>：DB定義の正本</li><li><a href="../02.src/app/layout.tsx">app/layout.tsx</a>・<a href="../02.src/next.config.ts">next.config.ts</a>・<a href="../02.src/tsconfig.json">tsconfig.json</a>・<a href="../package.json">package.json</a></li><li><a href="03_detailed_design.md">既存Markdown詳細設計書</a>：旧仕様を含むため実装を優先</li></ul><p class="meta">外部ライブラリ、外部フォント、JavaScript不要の単一HTML。ブラウザーで閲覧でき、印刷時はA4用スタイルを適用する。</p></section>
+</main><footer>Safety Quest 詳細設計書 ｜ 2026-10-19</footer>
+</body></html>

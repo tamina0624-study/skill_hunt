@@ -18,7 +18,7 @@
 
 ```mermaid
 flowchart TD
-    U["ブラウザ"] --> A["Next.js src/app"]
+    U["ブラウザ"] --> A["Next.js 02.src/app"]
     A --> LS["localStorage MVP"]
     A -.将来.-> API["Route Handlers"]
     API -.将来.-> DB["PostgreSQL"]
@@ -29,24 +29,21 @@ flowchart TD
 
 ```text
 safety-quest/
-  src/
+  00.secret/
+  01.doc/
+    gui_mock/
+  02.src/
     app/
-      layout.tsx
-      page.tsx
-      globals.css
-  prisma/
-    schema.prisma
-  doc/
-    01_requirements_specification.md
-    02_basic_design.md
-    03_detailed_design.md
-    04_test_specification.md
-    05_current_database_design.md
-  gui_mock/
-    *.html
+    lib/
+    prisma/schema.prisma
+    tsconfig.json
+    next.config.ts
+  03.log/
+    prompts.txt
+    current_status.txt
+    leftover_tasks.txt
+  GitSecurityTool/
   package.json
-  tsconfig.json
-  next.config.ts
 ```
 
 `node_modules` と `.next` は依存物・生成物であり、`src` 配下には置かない。
@@ -55,7 +52,7 @@ safety-quest/
 
 | モジュール | 責務 | 現行実装 |
 |---|---|---|
-| Auth | デモログイン | `src/app/page.tsx` |
+| Auth | デモログイン | `02.src/app/page.tsx` |
 | Dashboard | 件数、EP、推移、評価コメント表示 | `DashboardView` |
 | Knowledge | ナレッジ登録、KP判定 | `CreateView`, `judgeKnowledgePoints` |
 | AI Memo | 入力中ナレッジの整理メモ | `sendDraftMessage`, `buildDraftCoachReply` |
@@ -64,7 +61,7 @@ safety-quest/
 | List | 種別横断検索 | `ListView`, `buildSearchListItems` |
 | Report | 月次レポート作成・保存・表示 | `ReportView`, `buildAiReport` |
 | Settings | タイムゾーン、月次通知表示、初期化 | `SettingsView` |
-| DB Schema | PostgreSQL移行用DB定義 | `prisma/schema.prisma` |
+| DB Schema | PostgreSQL移行用DB定義 | `02.src/prisma/schema.prisma` |
 
 ## 5. 画面設計
 
@@ -106,7 +103,7 @@ flowchart TD
 | MonthlyReport | 月次評価、エンジニア力評価、対象年月 |
 | PointEvent | KP/SP/APの加算履歴 |
 
-詳細は `doc/05_current_database_design.md` と `prisma/schema.prisma` を参照する。
+詳細は `01.doc/05_current_database_design.md` と `02.src/prisma/schema.prisma` を参照する。
 
 ## 8. AI評価設計
 
